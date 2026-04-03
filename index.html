@@ -1,1 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#040810">
+<title>TAG Box Converter</title>
+<script>/* suppress babel warning */const _w=console.warn;console.warn=function(...a){if(a[0]&&typeof a[0]==='string'&&a[0].includes('Babel'))return;_w.apply(console,a)}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+*{-webkit-tap-highlight-color:transparent;box-sizing:border-box;margin:0;padding:0}
+html,body,#root{height:100%;width:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;background:#040810;color:#e2e8f0}
+body{padding-top:env(safe-area-inset-top)}
+input[type=number]{-moz-appearance:textfield;font-family:'SF Mono',ui-monospace,monospace}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+input[type=range]{-webkit-appearance:none;height:6px;border-radius:3px;background:#1e293b;outline:none;width:100%}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#f59e0b;border:3px solid #040810}
+::-webkit-scrollbar{display:none}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.sheet-anim{animation:sheetUp .25s ease-out}
+.fade-anim{animation:fadeIn .15s ease-out}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useMemo,useCallback,useRef,useEffect}=React;
 
+const DK={bg:"#040810",c1:"#0f172a",c2:"#1e293b",bd:"#1e293b",ac:"#f59e0b",ac2:"#d97706",
+  tx:"#e2e8f0",t2:"#94a3b8",t3:"#64748b",gn:"#22c55e",rd:"#ef4444",bl:"#3b82f6",or:"#f97316",pu:"#a855f7",cv:"#0d1117",bar:"rgba(10,15,26,.92)"};
+const LK={bg:"#f8fafc",c1:"#ffffff",c2:"#f1f5f9",bd:"#e2e8f0",ac:"#d97706",ac2:"#b45309",
+  tx:"#0f172a",t2:"#475569",t3:"#94a3b8",gn:"#16a34a",rd:"#dc2626",bl:"#2563eb",or:"#ea580c",pu:"#7c3aed",cv:"#ffffff",bar:"rgba(248,250,252,.92)"};
+const LC={cut:"#ef4444",fold:"#22c55e",crease:"#3b82f6",glue:"#6b7280",perf:"#f97316",tongue:"#a855f7",groove:"#ec4899"};
+const LL={cut:"Cut",fold:"Fold",crease:"Crease",glue:"Glue",perf:"Perf",tongue:"Tongue",groove:"Groove"};
+const GW=30;
+
+const CATS=[{id:"slotted",n:"Slotted",i:"📦"},{id:"telescope",n:"Telescope",i:"🔲"},{id:"folder",n:"Folders",i:"🗂"},
+  {id:"crash",n:"Crash Lock",i:"⚡"},{id:"mailer",n:"Mailers",i:"📮"},{id:"tg",n:"T&G",i:"🔗"},
+  {id:"specialty",n:"Specialty",i:"🎁"},{id:"food",n:"Food",i:"🍕"}];
+
+const BOXES=[
+  {id:"0201",c:"slotted",n:"FEFCO 0201",s:"RSC",d:"Regular Slotted Container",mL:80,mW:60,mH:40,dL:300,dW:200,dH:150},
+  {id:"0202",c:"slotted",n:"FEFCO 0202",s:"Overlap",d:"25mm overlap protection",mL:80,mW:60,mH:40,dL:300,dW:200,dH:150},
+  {id:"0203",c:"slotted",n:"FEFCO 0203",s:"Full Overlap",d:"Maximum base strength",mL:100,mW:80,mH:50,dL:350,dW:250,dH:200},
+  {id:"0204",c:"slotted",n:"FEFCO 0204",s:"Center Special",d:"Smooth flat base",mL:80,mW:60,mH:40,dL:300,dW:200,dH:150},
+  {id:"0210",c:"slotted",n:"FEFCO 0210",s:"Half Slotted",d:"Open top",mL:80,mW:60,mH:30,dL:400,dW:300,dH:200},
+  {id:"0215",c:"slotted",n:"FEFCO 0215",s:"Snap Lock",d:"Self-locking base",mL:80,mW:60,mH:40,dL:250,dW:180,dH:120},
+  {id:"0216",c:"slotted",n:"FEFCO 0216",s:"Tear Strip",d:"Shelf-ready",mL:100,mW:80,mH:50,dL:350,dW:250,dH:180},
+  {id:"0301",c:"telescope",n:"FEFCO 0301",s:"Full Telescope",d:"Equal lid & base",mL:80,mW:60,mH:40,dL:250,dW:200,dH:150},
+  {id:"0310",c:"telescope",n:"FEFCO 0310",s:"Shoebox",d:"Shallow lid",mL:80,mW:60,mH:40,dL:300,dW:200,dH:120},
+  {id:"0320",c:"telescope",n:"FEFCO 0320",s:"Bell Lid",d:"Full cover lid",mL:80,mW:60,mH:30,dL:200,dW:150,dH:100},
+  {id:"0401",c:"folder",n:"FEFCO 0401",s:"Folder Tray",d:"Flat tray",mL:80,mW:60,mH:20,dL:300,dW:200,dH:60},
+  {id:"0421",c:"folder",n:"FEFCO 0421",s:"Four-Corner",d:"Corner tabs",mL:100,mW:70,mH:25,dL:300,dW:200,dH:80},
+  {id:"0427",c:"folder",n:"FEFCO 0427",s:"Hinged Lid",d:"Tuck closure",mL:100,mW:60,mH:30,dL:250,dW:180,dH:100},
+  {id:"0711",c:"crash",n:"FEFCO 0711",s:"Crash Lock",d:"Snap base",mL:100,mW:60,mH:40,dL:300,dW:200,dH:150},
+  {id:"0713",c:"crash",n:"FEFCO 0713",s:"Crash+Tuck",d:"Auto bottom+tuck",mL:100,mW:60,mH:40,dL:250,dW:180,dH:130},
+  {id:"MAILER",c:"mailer",n:"Mailer Box",s:"Front-Tuck",d:"DTC brand box",mL:100,mW:60,mH:30,dL:300,dW:220,dH:80},
+  {id:"BOOKWRAP",c:"mailer",n:"Book Wrap",s:"Adjustable",d:"Height-adjustable",mL:150,mW:100,mH:10,dL:320,dW:250,dH:30},
+  {id:"RIGIDMAIL",c:"mailer",n:"Stay-Flat",s:"Document",d:"No-bend mailer",mL:200,mW:150,mH:5,dL:350,dW:250,dH:10},
+  {id:"TG_RSC",c:"tg",n:"T&G RSC",s:"Interlocking",d:"No tape needed",mL:100,mW:80,mH:50,dL:350,dW:250,dH:200},
+  {id:"TG_LOCK",c:"tg",n:"T&G Lock",s:"Full T&G",d:"All flaps interlock",mL:100,mW:80,mH:50,dL:300,dW:220,dH:180},
+  {id:"TG_TELESCOPE",c:"tg",n:"T&G Telescope",s:"T&G Lid",d:"Locking lid+base",mL:100,mW:80,mH:40,dL:250,dW:200,dH:150},
+  {id:"DISPLAY",c:"specialty",n:"Display",s:"Counter POS",d:"Tray with riser",mL:200,mW:150,mH:80,dL:300,dW:250,dH:150},
+  {id:"PILLOW",c:"specialty",n:"Pillow Box",s:"Curved",d:"Gift box",mL:80,mW:50,mH:25,dL:150,dW:100,dH:40},
+  {id:"HEXAGON",c:"specialty",n:"Hexagonal",s:"Six-Sided",d:"Hex tube",mL:80,mW:80,mH:60,dL:120,dW:120,dH:200},
+  {id:"PIZZA",c:"food",n:"Pizza Box",s:"Lock Corner",d:"Hinged lid",mL:200,mW:200,mH:40,dL:350,dW:350,dH:45},
+  {id:"CAKEBOX",c:"food",n:"Bakery Box",s:"Window-Ready",d:"Tall bakery",mL:150,mW:150,mH:80,dL:250,dW:250,dH:120},
+];
+
+const MATS=[
+  {id:"F",n:"F-Flute",t:0.8,gsm:110,d:"Ultra-thin",cost:0.85,ect:3.5},
+  {id:"E",n:"E-Flute",t:1.5,gsm:135,d:"Retail grade",cost:0.95,ect:5.0},
+  {id:"B",n:"B-Flute",t:3.0,gsm:175,d:"Standard shipping",cost:0.65,ect:7.0},
+  {id:"C",n:"C-Flute",t:4.0,gsm:200,d:"Heavy-duty",cost:0.70,ect:8.0},
+  {id:"BC",n:"BC Double",t:6.0,gsm:425,d:"Max protection",cost:1.20,ect:14.0},
+  {id:"SBS",n:"SBS",t:0.5,gsm:325,d:"Premium white",cost:1.80,ect:2.0},
+  {id:"KRAFT",n:"Kraft",t:0.6,gsm:275,d:"Natural brown",cost:0.55,ect:3.0},
+  {id:"WKRAFT",n:"White Kraft",t:0.6,gsm:275,d:"Bleached kraft",cost:0.80,ect:3.0},
+];
+
+// ═══ GEOMETRY ENGINE ═══
+function $(a,x1,y1,x2,y2,t){a.push({x1,y1,x2,y2,type:t})}
+function gt(a,yB,yT,H){const g=GW,t=Math.min(8,g*.25);$(a,t,yB,0,yB+H*.12,"cut");$(a,0,yB+H*.12,0,yT-H*.12,"cut");$(a,0,yT-H*.12,t,yT,"cut");$(a,t,yT,g,yT,"glue");$(a,t,yB,g,yB,"glue");$(a,g,yB,g,yT,"fold")}
+function tongue(a,x,y,w,h,d){const tw=w*.4,i=(w-tw)/2;if(d==="u"){$(a,x,y,x+i,y,"cut");$(a,x+i,y,x+i,y+h,"tongue");$(a,x+i,y+h,x+i+tw,y+h,"tongue");$(a,x+i+tw,y+h,x+i+tw,y,"tongue");$(a,x+i+tw,y,x+w,y,"cut")}else{$(a,x,y,x+i,y,"cut");$(a,x+i,y,x+i,y-h,"tongue");$(a,x+i,y-h,x+i+tw,y-h,"tongue");$(a,x+i+tw,y-h,x+i+tw,y,"tongue");$(a,x+i+tw,y,x+w,y,"cut")}}
+function groove(a,x,y,w,h,d){const gw=w*.42,i=(w-gw)/2;if(d==="u"){$(a,x+i,y,x+i,y+h,"groove");$(a,x+i,y+h,x+i+gw,y+h,"groove");$(a,x+i+gw,y+h,x+i+gw,y,"groove")}else{$(a,x+i,y,x+i,y-h,"groove");$(a,x+i,y-h,x+i+gw,y-h,"groove");$(a,x+i+gw,y-h,x+i+gw,y,"groove")}}
+
+function genSlotted(L,W,H,T,mode){const a=[];const ov=mode==="partial"?25:0;const mjF=mode==="full"?W:mode==="center"?W/2:W/2+ov,mnF=mode==="center"?L/2:W/2;const mx=Math.max(mjF,mnF),yB=mx,yT=mx+H;const px=[0,GW,GW+W,GW+W+L,GW+W+L+W,GW+W+L+W+L];gt(a,yB,yT,H);for(let i=2;i<px.length;i++)$(a,px[i],yB,px[i],yT,i<px.length-1?"fold":"cut");[{x1:px[1],x2:px[2],m:0},{x1:px[2],x2:px[3],m:1},{x1:px[3],x2:px[4],m:0},{x1:px[4],x2:px[5],m:1}].forEach(p=>{const fd=p.m?mjF:mnF,pw=p.x2-p.x1,e=!p.m?Math.max(1,Math.min(4,pw*.015)):0;$(a,p.x1,yT,p.x2,yT,"fold");$(a,p.x1+e,yT,p.x1+e,yT+fd,"cut");if(e>0)$(a,p.x1,yT,p.x1+e,yT+e*.3,"cut");$(a,p.x1+e,yT+fd,p.x2-e,yT+fd,"cut");$(a,p.x2-e,yT+fd,p.x2-e,yT,"cut");if(e>0)$(a,p.x2-e,yT+e*.3,p.x2,yT,"cut");$(a,p.x1,yB,p.x2,yB,"fold");$(a,p.x1+e,yB,p.x1+e,yB-fd,"cut");if(e>0)$(a,p.x1,yB,p.x1+e,yB-e*.3,"cut");$(a,p.x1+e,yB-fd,p.x2-e,yB-fd,"cut");$(a,p.x2-e,yB-fd,p.x2-e,yB,"cut");if(e>0)$(a,p.x2-e,yB-e*.3,p.x2,yB,"cut")});if(mode==="tear")$(a,px[1],yB+H*.4,px[5],yB+H*.4,"perf");return{segments:a,width:px[5],height:mx+H+mx}}
+function genSnapLock(L,W,H,T){const a=[],fD=W/2,yB=fD+15,yT=yB+H;const px=[0,GW,GW+W,GW+W+L,GW+W+L+W,GW+W+L+W+L];gt(a,yB,yT,H);for(let i=2;i<px.length;i++)$(a,px[i],yB,px[i],yT,i<px.length-1?"fold":"cut");for(let i=0;i<4;i++){const x1=px[i+1],x2=px[i+2],pw=x2-x1;$(a,x1,yT,x2,yT,"fold");$(a,x1,yT,x1,yT+fD,"cut");$(a,x1,yT+fD,x2,yT+fD,"cut");$(a,x2,yT+fD,x2,yT,"cut");$(a,x1,yB,x2,yB,"fold");if(i%2===0){const ins=pw*.08,cx=(x1+x2)/2;$(a,x1,yB,x1+ins,yB-fD*.85,"cut");$(a,x1+ins,yB-fD*.85,cx-6,yB-fD*.85,"cut");$(a,cx-6,yB-fD*.85,cx-6,yB-fD*.85-8,"cut");$(a,cx-6,yB-fD*.85-8,cx+6,yB-fD*.85-8,"cut");$(a,cx+6,yB-fD*.85-8,cx+6,yB-fD*.85,"cut");$(a,cx+6,yB-fD*.85,x2-ins,yB-fD*.85,"cut");$(a,x2-ins,yB-fD*.85,x2,yB,"cut")}else{$(a,x1,yB,x1,yB-fD,"cut");$(a,x1,yB-fD,x2,yB-fD,"cut");$(a,x2,yB-fD,x2,yB,"cut")}}return{segments:a,width:px[5],height:yT+fD+5}}
+function genHSC(L,W,H){const a=[],fD=W/2,yB=fD,yT=fD+H;const px=[0,GW,GW+W,GW+W+L,GW+W+L+W,GW+W+L+W+L];gt(a,yB,yT,H);for(let i=2;i<px.length;i++)$(a,px[i],yB,px[i],yT,i<px.length-1?"fold":"cut");$(a,px[1],yT,px[5],yT,"cut");for(let i=0;i<4;i++){const x1=px[i+1],x2=px[i+2],e=i%2===0?2:0;$(a,x1,yB,x2,yB,"fold");$(a,x1+e,yB,x1+e,yB-fD,"cut");$(a,x1+e,yB-fD,x2-e,yB-fD,"cut");$(a,x2-e,yB-fD,x2-e,yB,"cut");if(e>0){$(a,x1,yB,x1+e,yB,"cut");$(a,x2-e,yB,x2,yB,"cut")}}return{segments:a,width:px[5],height:fD+H}}
+function genTelescope(L,W,H,T,lr){const a=[],bH=H*(1-lr)+8,lH=H*lr,cl=T*2+1;const bf=W/2,byB=bf,byT=bf+bH,bpx=[0,GW,GW+W,GW+W+L,GW+W+L+W,GW+W+L+W+L];gt(a,byB,byT,bH);for(let i=2;i<bpx.length;i++)$(a,bpx[i],byB,bpx[i],byT,i<bpx.length-1?"fold":"cut");$(a,bpx[1],byT,bpx[5],byT,"cut");for(let i=0;i<4;i++){const x1=bpx[i+1],x2=bpx[i+2];$(a,x1,byB,x2,byB,"fold");$(a,x1,byB,x1,byB-bf,"cut");$(a,x1,byB-bf,x2,byB-bf,"cut");$(a,x2,byB-bf,x2,byB,"cut")}const oY=bf+bH+25,lL=L+cl,lW=W+cl,lf=lW/2,lyB=oY+lf,lyT=oY+lf+lH;const lpx=[0,GW,GW+lW,GW+lW+lL,GW+lW+lL+lW,GW+lW+lL+lW+lL];gt(a,lyB,lyT,lH);for(let i=2;i<lpx.length;i++)$(a,lpx[i],lyB,lpx[i],lyT,i<lpx.length-1?"fold":"cut");$(a,lpx[1],lyT,lpx[5],lyT,"cut");for(let i=0;i<4;i++){const x1=lpx[i+1],x2=lpx[i+2];$(a,x1,lyB,x2,lyB,"fold");$(a,x1,lyB,x1,lyB-lf,"cut");$(a,x1,lyB-lf,x2,lyB-lf,"cut");$(a,x2,lyB-lf,x2,lyB,"cut")}$(a,0,oY-12,Math.max(bpx[5],lpx[5]),oY-12,"crease");return{segments:a,width:Math.max(bpx[5],lpx[5]),height:oY+lf+lH+lf}}
+function genFolder(L,W,H){const a=[],tW=H+W+L+W+H,tH=H+L+H;const x0=H,x1=H+W,x2=H+W+L,x3=H+W+L+W,y0=H,y1=H+L;$(a,0,y0,0,y1,"cut");$(a,0,y0,x0,y0,"cut");$(a,0,y1,x0,y1,"cut");$(a,x0,y0,x0,y1,"fold");$(a,x3,y0,x3,y1,"fold");$(a,x3,y0,tW,y0,"cut");$(a,x3,y1,tW,y1,"cut");$(a,tW,y0,tW,y1,"cut");$(a,x0,y0,x0,0,"cut");$(a,x0,0,x3,0,"cut");$(a,x3,0,x3,y0,"cut");$(a,x1,y0,x1,0,"fold");$(a,x2,y0,x2,0,"fold");$(a,x0,y1,x0,tH,"cut");$(a,x0,tH,x3,tH,"cut");$(a,x3,tH,x3,y1,"cut");$(a,x1,y1,x1,tH,"fold");$(a,x2,y1,x2,tH,"fold");return{segments:a,width:tW,height:tH}}
+function genMailer(L,W,H){const a=[],g=GW,tk=W*.6;const yF=H,yBa=H+L,yBk=H+L+H,yLd=H+L+H+L,yTk=yLd+tk,xL=g,xR=g+W,tW=g+W+g;$(a,xL,0,xR,0,"cut");$(a,xL,0,xL,yF,"cut");$(a,xR,0,xR,yF,"cut");$(a,xL,yF,xR,yF,"fold");$(a,0,yF,0,yBa,"cut");$(a,0,yF,xL,yF,"fold");$(a,0,yBa,xL,yBa,"fold");$(a,xR,yF,tW,yF,"fold");$(a,xR,yBa,tW,yBa,"fold");$(a,tW,yF,tW,yBa,"cut");$(a,xL,yBa,xR,yBa,"fold");$(a,xL,yF,xL,yBk,"cut");$(a,xR,yF,xR,yBk,"cut");$(a,xL,yBk,xR,yBk,"fold");$(a,xL,yBk,xL,yLd,"cut");$(a,xR,yBk,xR,yLd,"cut");$(a,xL,yLd,xR,yLd,"fold");$(a,0,yBk,0,yLd,"cut");$(a,0,yBk,xL,yBk,"fold");$(a,0,yLd,xL,yLd,"fold");$(a,xR,yBk,tW,yBk,"fold");$(a,xR,yLd,tW,yLd,"fold");$(a,tW,yBk,tW,yLd,"cut");$(a,xL+2,yLd,xL+2,yTk-5,"cut");$(a,xL+2,yTk-5,xL+W*.3,yTk,"cut");$(a,xL+W*.3,yTk,xR-W*.3,yTk,"cut");$(a,xR-W*.3,yTk,xR-2,yTk-5,"cut");$(a,xR-2,yTk-5,xR-2,yLd,"cut");return{segments:a,width:tW,height:yTk}}
+function genCrashLock(L,W,H,T,tk){const a=[],fD=W/2,ex=fD+20,yB=ex,yT=ex+H;const px=[0,GW,GW+W,GW+W+L,GW+W+L+W,GW+W+L+W+L];gt(a,yB,yT,H);for(let i=2;i<px.length;i++)$(a,px[i],yB,px[i],yT,i<px.length-1?"fold":"cut");for(let i=0;i<4;i++){const x1=px[i+1],x2=px[i+2],pw=x2-x1;$(a,x1,yT,x2,yT,"fold");if(tk&&i===1){const td=fD*.8;$(a,x1+2,yT,x1+2,yT+td-5,"cut");$(a,x1+2,yT+td-5,x1+pw*.25,yT+td,"cut");$(a,x1+pw*.25,yT+td,x2-pw*.25,yT+td,"cut");$(a,x2-pw*.25,yT+td,x2-2,yT+td-5,"cut");$(a,x2-2,yT+td-5,x2-2,yT,"cut")}else{$(a,x1,yT,x1,yT+fD,"cut");$(a,x1,yT+fD,x2,yT+fD,"cut");$(a,x2,yT+fD,x2,yT,"cut")}$(a,x1,yB,x2,yB,"fold");if(i%2===0){const m=(x1+x2)/2;$(a,x1,yB,m,yB-fD*.9,"cut");$(a,m,yB-fD*.9,x2,yB,"cut");$(a,x1+pw*.2,yB-fD*.3,x2-pw*.2,yB-fD*.3,"glue")}else{$(a,x1,yB,x1,yB-fD,"cut");$(a,x1,yB-fD,x2,yB-fD,"cut");$(a,x2,yB-fD,x2,yB,"cut");$(a,x1+10,yB-fD+8,x2-10,yB-fD+8,"glue")}}return{segments:a,width:px[5],height:yT+fD+5}}
+function genTGRSC(L,W,H,T){const a=[],fD=W/2,tH=T*3+4,yB=fD+tH,yT=yB+H;const px=[0,GW,GW+W,GW+W+L,GW+W+L+W,GW+W+L+W+L];gt(a,yB,yT,H);for(let i=2;i<px.length;i++)$(a,px[i],yB,px[i],yT,i<px.length-1?"fold":"cut");[{x1:px[1],x2:px[2],m:0},{x1:px[2],x2:px[3],m:1},{x1:px[3],x2:px[4],m:0},{x1:px[4],x2:px[5],m:1}].forEach(p=>{const pw=p.x2-p.x1;$(a,p.x1,yT,p.x2,yT,"fold");if(p.m){$(a,p.x1,yT,p.x1,yT+fD,"cut");tongue(a,p.x1,yT+fD,pw,tH,"u");$(a,p.x2,yT+fD,p.x2,yT,"cut")}else{$(a,p.x1,yT,p.x1,yT+fD,"cut");$(a,p.x1,yT+fD,p.x2,yT+fD,"cut");groove(a,p.x1,yT+fD-2,pw,tH*.8,"u");$(a,p.x2,yT+fD,p.x2,yT,"cut")}$(a,p.x1,yB,p.x2,yB,"fold");if(p.m){$(a,p.x1,yB,p.x1,yB-fD,"cut");$(a,p.x1,yB-fD,p.x2,yB-fD,"cut");groove(a,p.x1,yB-fD+2,pw,tH*.8,"d");$(a,p.x2,yB-fD,p.x2,yB,"cut")}else{$(a,p.x1,yB,p.x1,yB-fD,"cut");tongue(a,p.x1,yB-fD,pw,tH,"d");$(a,p.x2,yB-fD,p.x2,yB,"cut")}});return{segments:a,width:px[5],height:yT+fD+tH+5}}
+function genBookWrap(L,W,H){const a=[];const wD=H+Math.ceil(W/2)+15,eD=H+15,tW=wD+L+wD,tH=eD+W+eD;const x0=wD,x1=wD+L,y0=eD,y1=eD+W;$(a,0,y0,0,y1,"cut");$(a,0,y0,x0,y0,"cut");$(a,0,y1,x0,y1,"cut");$(a,x1,y0,tW,y0,"cut");$(a,x1,y1,tW,y1,"cut");$(a,tW,y0,tW,y1,"cut");$(a,x0,y0,x0,y1,"fold");$(a,x1,y0,x1,y1,"fold");$(a,x0,y0,x0,0,"cut");$(a,x0,0,x1,0,"cut");$(a,x1,0,x1,y0,"cut");$(a,x0,y0,x1,y0,"fold");$(a,x0,y1,x0,tH,"cut");$(a,x0,tH,x1,tH,"cut");$(a,x1,tH,x1,y1,"cut");$(a,x0,y1,x1,y1,"fold");$(a,x0-H,y0,x0-H,y1,"fold");$(a,x1+H,y0,x1+H,y1,"fold");for(let d=5;d<wD-3;d+=5){if(Math.abs(d-H)>2){$(a,x0-d,y0,x0-d,y1,"crease");$(a,x1+d,y0,x1+d,y1,"crease")}}$(a,x0,y0-H,x1,y0-H,"fold");$(a,x0,y1+H,x1,y1+H,"fold");return{segments:a,width:tW,height:tH}}
+function genRigidMail(L,W,H){const a=[],fD=Math.max(25,Math.min(W/3,50)),tW=fD+L+fD,tH=fD+W+fD;const x0=fD,x1=fD+L,y0=fD,y1=fD+W;$(a,0,y0+5,0,y1-5,"cut");$(a,0,y0+5,x0,y0,"cut");$(a,0,y1-5,x0,y1,"cut");$(a,x0,y0,x0,y1,"fold");$(a,tW,y0+5,tW,y1-5,"cut");$(a,x1,y0,tW,y0+5,"cut");$(a,x1,y1,tW,y1-5,"cut");$(a,x1,y0,x1,y1,"fold");$(a,x0,y0,x0,0,"cut");$(a,x0,0,x1,0,"cut");$(a,x1,0,x1,y0,"cut");$(a,x0,y0,x1,y0,"fold");$(a,x0,y1,x0,tH,"cut");$(a,x0,tH,x1,tH,"cut");$(a,x1,tH,x1,y1,"cut");$(a,x0,y1,x1,y1,"fold");$(a,x0+8,y1+fD*.65,x1-8,y1+fD*.65,"glue");$(a,x0+8,y1+fD*.7,x1-8,y1+fD*.7,"perf");return{segments:a,width:tW,height:tH}}
+function genPillow(L,W,H){const a=[],c=H;$(a,0,c,0,c+W,"cut");$(a,L,c,L,c+W,"cut");$(a,0,c,L,c,"fold");$(a,0,c+W,L,c+W,"fold");for(let i=0;i<24;i++){const t1=i/24,t2=(i+1)/24;$(a,t1*L,c-Math.sin(t1*Math.PI)*c,t2*L,c-Math.sin(t2*Math.PI)*c,"cut");$(a,t1*L,c+W+Math.sin(t1*Math.PI)*c,t2*L,c+W+Math.sin(t2*Math.PI)*c,"cut")}return{segments:a,width:L,height:W+H*2}}
+function genHex(L,W,H){const a=[],s=W/2,tW=s*6+GW,fD=s*.866;for(let i=0;i<6;i++)$(a,GW+i*s,fD,GW+i*s,fD+H,"fold");$(a,tW,fD,tW,fD+H,"cut");$(a,0,fD+H*.1,0,fD+H*.9,"cut");$(a,0,fD+H*.1,5,fD,"cut");$(a,5,fD,GW,fD,"cut");$(a,0,fD+H*.9,5,fD+H,"cut");$(a,5,fD+H,GW,fD+H,"cut");$(a,GW,fD,GW,fD+H,"fold");for(let i=0;i<6;i++){const x1=GW+i*s,x2=x1+s,m=(x1+x2)/2;if(i%2===0){$(a,x1,fD+H,x1,fD+H+fD,"cut");$(a,x1,fD+H+fD,x2,fD+H+fD,"cut");$(a,x2,fD+H+fD,x2,fD+H,"cut");$(a,x1,fD,x1,0,"cut");$(a,x1,0,x2,0,"cut");$(a,x2,0,x2,fD,"cut")}else{$(a,x1,fD+H,m,fD+H+fD*.8,"cut");$(a,m,fD+H+fD*.8,x2,fD+H,"cut");$(a,x1,fD,m,fD-fD*.8,"cut");$(a,m,fD-fD*.8,x2,fD,"cut")}$(a,x1,fD+H,x2,fD+H,"fold");$(a,x1,fD,x2,fD,"fold")}return{segments:a,width:tW,height:fD+H+fD}}
+function genDisplay(L,W,H){const a=[],rH=H*1.5,lip=H*.3,tW=GW+W+L+W+GW,tH=lip+W+rH;const x0=GW,x1=GW+W,x2=GW+W+L,x3=GW+W+L+W,y0=lip,y1=lip+W;$(a,x0,y0,x0,y1,"fold");$(a,x1,y0,x1,y1,"fold");$(a,x2,y0,x2,y1,"fold");$(a,x3,y0,x3,y1,"fold");$(a,0,y0,x0,y0,"cut");$(a,0,y1,x0,y1,"cut");$(a,0,y0,0,y1,"cut");$(a,x3,y0,tW,y0,"cut");$(a,x3,y1,tW,y1,"cut");$(a,tW,y0,tW,y1,"cut");$(a,x0,y0,x0,0,"cut");$(a,x0,0,x3,0,"cut");$(a,x3,0,x3,y0,"cut");$(a,x1,y0,x1,0,"fold");$(a,x2,y0,x2,0,"fold");$(a,x0,y1,x0,tH,"cut");$(a,x0,tH,x3,tH,"cut");$(a,x3,tH,x3,y1,"cut");$(a,x0,y1+H,x3,y1+H,"fold");return{segments:a,width:tW,height:tH}}
+function genPizza(L,W,H){const a=[],eW=H+5,tW=eW+W+L+W+eW,tH=H+W+H;const x0=eW,x1=eW+W,x2=eW+W+L,x3=eW+W+L+W,y0=H,y1=H+W;$(a,x0,y0,x0,y1,"fold");$(a,x1,y0,x1,y1,"fold");$(a,x2,y0,x2,y1,"fold");$(a,x3,y0,x3,y1,"fold");$(a,0,y0,x0,y0,"cut");$(a,0,y1,x0,y1,"cut");$(a,0,y0,0,y1,"cut");$(a,x3,y0,tW,y0,"cut");$(a,x3,y1,tW,y1,"cut");$(a,tW,y0,tW,y1,"cut");$(a,x0,y0,x0,0,"cut");$(a,x0,0,x3,0,"cut");$(a,x3,0,x3,y0,"cut");$(a,x1,y0,x1,0,"fold");$(a,x2,y0,x2,0,"fold");const cx=(x1+x2)/2,lt=Math.min(L*.12,30),lh=Math.min(H*.3,15);$(a,cx-lt,0,cx-lt,-lh,"cut");$(a,cx-lt,-lh,cx+lt,-lh,"cut");$(a,cx+lt,-lh,cx+lt,0,"cut");$(a,x0,y1,x0,tH,"cut");$(a,x0,tH,x3,tH,"cut");$(a,x3,tH,x3,y1,"cut");$(a,x1,y1,x1,tH,"fold");$(a,x2,y1,x2,tH,"fold");$(a,x0,y1,x3,y1,"fold");$(a,cx-20,y1+(tH-y1)*.5,cx+20,y1+(tH-y1)*.5,"perf");return{segments:a,width:tW,height:tH+lh}}
+
+function gen(id,L,W,H,T){const m={"0201":()=>genSlotted(L,W,H,T,"half"),"0202":()=>genSlotted(L,W,H,T,"partial"),"0203":()=>genSlotted(L,W,H,T,"full"),"0204":()=>genSlotted(L,W,H,T,"center"),"0210":()=>genHSC(L,W,H),"0215":()=>genSnapLock(L,W,H,T),"0216":()=>genSlotted(L,W,H,T,"tear"),"0301":()=>genTelescope(L,W,H,T,.5),"0310":()=>genTelescope(L,W,H,T,.25),"0320":()=>genTelescope(L,W,H,T,.85),"0401":()=>genFolder(L,W,H),"0421":()=>genFolder(L,W,H),"0427":()=>genMailer(L,W,H),"0711":()=>genCrashLock(L,W,H,T,false),"0713":()=>genCrashLock(L,W,H,T,true),"MAILER":()=>genMailer(L,W,H),"BOOKWRAP":()=>genBookWrap(L,W,H),"RIGIDMAIL":()=>genRigidMail(L,W,H),"TG_RSC":()=>genTGRSC(L,W,H,T),"TG_LOCK":()=>genTGRSC(L,W,H,T),"TG_TELESCOPE":()=>genTelescope(L,W,H,T,.5),"DISPLAY":()=>genDisplay(L,W,H),"PILLOW":()=>genPillow(L,W,H),"HEXAGON":()=>genHex(L,W,H),"PIZZA":()=>genPizza(L,W,H),"CAKEBOX":()=>genSlotted(L,W,H,T,"half")};return(m[id]||m["0201"])()}
+
+function makeDXF(r){let d="",h=1;const w=s=>{d+=s+"\n"};w("0");w("SECTION");w("2");w("HEADER");w("9");w("$ACADVER");w("1");w("AC1015");w("9");w("$INSUNITS");w("70");w("4");w("0");w("ENDSEC");w("0");w("SECTION");w("2");w("TABLES");w("0");w("TABLE");w("2");w("LAYER");w("70");w("7");const dc={cut:1,fold:3,crease:5,glue:8,perf:30,tongue:6,groove:7};Object.keys(dc).forEach(t=>{w("0");w("LAYER");w("2");w(t.toUpperCase());w("70");w("0");w("62");w(""+dc[t]);w("6");w("CONTINUOUS")});w("0");w("ENDTAB");w("0");w("ENDSEC");w("0");w("SECTION");w("2");w("ENTITIES");r.segments.forEach(s=>{w("0");w("LINE");w("5");w((h++).toString(16));w("8");w(s.type.toUpperCase());w("62");w(""+(dc[s.type]||7));w("10");w(s.x1.toFixed(4));w("20");w(s.y1.toFixed(4));w("30");w("0");w("11");w(s.x2.toFixed(4));w("21");w(s.y2.toFixed(4));w("31");w("0")});w("0");w("ENDSEC");w("0");w("EOF");return d}
+function makeSVG(r){const{segments:ss,width:ww,height:hh}=r;const p=20;const dm={cut:"",fold:"6,4",crease:"8,3,2,3",glue:"3,3",perf:"2,4",tongue:"4,2",groove:"2,2,6,2"};let o=`<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${ww+p*2}mm" height="${hh+p*2}mm" viewBox="0 0 ${ww+p*2} ${hh+p*2}">\n<rect width="100%" height="100%" fill="white"/>\n`;ss.forEach(s=>{const ds=dm[s.type]?` stroke-dasharray="${dm[s.type]}"`:"";o+=`<line x1="${(s.x1+p).toFixed(2)}" y1="${(hh+p-s.y1).toFixed(2)}" x2="${(s.x2+p).toFixed(2)}" y2="${(hh+p-s.y2).toFixed(2)}" stroke="${LC[s.type]}" stroke-width="0.5"${ds}/>\n`});return o+"</svg>"}
+function dl(c,f,m){const b=new Blob([c],{type:m}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=f;a.click();URL.revokeObjectURL(u)}
+
+// ═══ APP ═══
+function App(){
+  const[dk,setDk]=useState(true);
+  const[tab,setTab]=useState("design");
+  const[boxId,setBoxId]=useState("0201");
+  const[dims,setDims]=useState({L:300,W:200,H:150});
+  const[matId,setMatId]=useState("B");
+  const[catF,setCatF]=useState(null);
+  const[pm,setPm]=useState("2d");
+  const[sheet,setSheet]=useState(null);
+  const[rot,setRot]=useState({x:-25,y:35});
+  const[zm,setZm]=useState(1);
+  const[aiLoading,setAiLoading]=useState(false);
+  const[aiResult,setAiResult]=useState(null);
+  const touchRef=useRef(null);
+  const pinchRef=useRef(null);
+  const canvasRef=useRef(null);
+  const aiFileRef=useRef(null);
+  const aiImgRef=useRef(null);
+
+  const T=dk?DK:LK;const mat=MATS.find(m=>m.id===matId);const mt=mat?.t||3;
+  const{L,W,H}=dims;const bt=BOXES.find(b=>b.id===boxId);
+
+  const valid=useMemo(()=>{const e=[];if(L<=0||W<=0||H<=0)e.push("All dimensions must be > 0");
+    if(bt){if(L<bt.mL)e.push(`Length ≥ ${bt.mL}mm`);if(W<bt.mW)e.push(`Width ≥ ${bt.mW}mm`);if(H<bt.mH)e.push(`Height ≥ ${bt.mH}mm`)}
+    return{ok:e.length===0,e}},[L,W,H,bt]);
+
+  const result=useMemo(()=>valid.ok?gen(boxId,L,W,H,mt):null,[boxId,L,W,H,mt,valid.ok]);
+  const segC=useMemo(()=>{if(!result)return{};const c={};result.segments.forEach(s=>{c[s.type]=(c[s.type]||0)+1});return c},[result]);
+  const bct=useMemo(()=>{if(!mat)return null;const p=2*(L+W);const v=5.87*mat.ect*Math.sqrt(mt*p);return{v:v.toFixed(0),s:(v*.65).toFixed(0)}},[L,W,mat,mt]);
+  const unitCost=result&&mat?(result.width*result.height/1e6*mat.cost).toFixed(3):null;
+
+  const changeBox=useCallback(id=>{setBoxId(id);const b=BOXES.find(x=>x.id===id);if(b)setDims({L:b.dL,W:b.dW,H:b.dH})},[]);
+  const resetDims=useCallback(()=>{if(bt)setDims({L:bt.dL,W:bt.dW,H:bt.dH})},[bt]);
+  const doExport=useCallback(f=>{if(!result)return;const n=`${boxId}_${L}x${W}x${H}`;if(f==="dxf")dl(makeDXF(result),n+".dxf","application/dxf");if(f==="svg")dl(makeSVG(result),n+".svg","image/svg+xml")},[result,boxId,L,W,H]);
+  const fBoxes=useMemo(()=>catF?BOXES.filter(b=>b.c===catF):BOXES,[catF]);
+
+  // ── 3D Touch: use native addEventListener for passive:false ──
+  useEffect(()=>{
+    const el=canvasRef.current;if(!el)return;
+    const onTS=e=>{if(e.touches.length===1){const t=e.touches[0];touchRef.current={x:t.clientX,y:t.clientY,rx:rot.x,ry:rot.y}}
+      if(e.touches.length===2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);pinchRef.current={d,z:zm}}};
+    const onTM=e=>{e.preventDefault();
+      if(e.touches.length===1&&touchRef.current){const t=e.touches[0];setRot({x:touchRef.current.rx+(t.clientY-touchRef.current.y)*.4,y:touchRef.current.ry+(t.clientX-touchRef.current.x)*.4})}
+      if(e.touches.length===2&&pinchRef.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);setZm(Math.max(.3,Math.min(4,pinchRef.current.z*(d/pinchRef.current.d))))}};
+    const onTE=()=>{touchRef.current=null;pinchRef.current=null};
+    el.addEventListener("touchstart",onTS,{passive:true});el.addEventListener("touchmove",onTM,{passive:false});el.addEventListener("touchend",onTE);
+    return()=>{el.removeEventListener("touchstart",onTS);el.removeEventListener("touchmove",onTM);el.removeEventListener("touchend",onTE)};
+  },[rot.x,rot.y,zm]);
+
+  // ── AI Upload Handler ──
+  const handleAI=useCallback(async(e,type)=>{
+    const file=e.target.files?.[0];if(!file)return;
+    setAiLoading(true);setAiResult(null);
+    try{const b64=await new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result.split(",")[1]);rd.onerror=()=>j("fail");rd.readAsDataURL(file)});
+      const isPDF=file.type==="application/pdf";
+      const prompt=type==="pdf"
+        ?`Analyze this ${isPDF?"PDF":"image"} spec sheet for a box. Extract dimensions and box type. Respond ONLY with JSON: {"length_mm":number,"width_mm":number,"height_mm":number,"box_type":"FEFCO code","confidence":"high/medium/low","notes":"observations"}`
+        :`Analyze this photo of a box. Identify FEFCO type and estimate dimensions in mm. Respond ONLY with JSON: {"box_type":"FEFCO code","length_mm":number,"width_mm":number,"height_mm":number,"material_guess":"type","confidence":"high/medium/low","notes":"observations"}`;
+      const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:[
+          {type:isPDF?"document":"image",source:{type:"base64",media_type:file.type,data:b64}},{type:"text",text:prompt}]}]})});
+      const data=await resp.json();const txt=data.content?.find(c=>c.type==="text")?.text||"";
+      const parsed=JSON.parse(txt.replace(/```json|```/g,"").trim());
+      setAiResult(parsed);
+      if(parsed.length_mm>0&&parsed.width_mm>0&&parsed.height_mm>0){
+        setDims({L:Math.round(parsed.length_mm),W:Math.round(parsed.width_mm),H:Math.round(parsed.height_mm)});
+        const mb=BOXES.find(b=>b.id===parsed.box_type);if(mb)setBoxId(mb.id)}
+    }catch(err){setAiResult({error:err.toString()})}finally{setAiLoading(false);if(e.target)e.target.value=""}
+  },[]);
+
+  // ── Components ──
+  const Dim=({label,k})=>(
+    <div style={{background:T.c1,borderRadius:14,border:`1px solid ${T.bd}`,padding:"12px 16px",marginBottom:8}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+        <span style={{fontSize:12,fontWeight:700,color:T.t3,letterSpacing:1}}>{label}</span>
+        <span style={{fontSize:11,color:T.t3}}>mm</span>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <button onClick={()=>setDims(d=>({...d,[k]:Math.max(0,d[k]-5)}))}
+          style={{width:44,height:44,borderRadius:12,background:T.c2,border:`1px solid ${T.bd}`,color:T.ac,fontSize:22,fontWeight:700,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+        <input type="number" value={dims[k]} onChange={e=>setDims(d=>({...d,[k]:Math.max(0,parseFloat(e.target.value)||0)}))}
+          style={{flex:1,background:"none",border:"none",color:T.tx,fontSize:28,fontWeight:800,textAlign:"center",outline:"none",fontFamily:"SF Mono,monospace"}}/>
+        <button onClick={()=>setDims(d=>({...d,[k]:d[k]+5}))}
+          style={{width:44,height:44,borderRadius:12,background:T.c2,border:`1px solid ${T.bd}`,color:T.ac,fontSize:22,fontWeight:700,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+      </div>
+    </div>
+  );
+
+  const Sheet=({title,children,onClose})=>(
+    <div style={{position:"fixed",inset:0,zIndex:200}} onClick={onClose}>
+      <div className="fade-anim" style={{position:"absolute",inset:0,background:"rgba(0,0,0,.6)"}}/>
+      <div className="sheet-anim" onClick={e=>e.stopPropagation()} style={{position:"absolute",bottom:0,left:0,right:0,background:T.c1,borderRadius:"24px 24px 0 0",maxHeight:"80vh",display:"flex",flexDirection:"column",paddingBottom:`max(16px,env(safe-area-inset-bottom))`}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 6px"}}><div style={{width:40,height:4,borderRadius:2,background:T.bd}}/></div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 20px 12px"}}>
+          <span style={{fontWeight:800,fontSize:18,color:T.tx}}>{title}</span>
+          <button onClick={onClose} style={{width:32,height:32,borderRadius:16,background:T.c2,border:"none",color:T.t2,fontSize:15,fontWeight:700}}>✕</button>
+        </div>
+        <div style={{overflow:"auto",padding:"0 20px 16px",flex:1}}>{children}</div>
+      </div>
+    </div>
+  );
+
+  // ═══ RENDER ═══
+  return(
+    <div style={{height:"100%",display:"flex",flexDirection:"column",background:T.bg,overflow:"hidden"}}>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px 6px",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:34,height:34,borderRadius:10,background:`linear-gradient(135deg,${T.ac},${T.ac2})`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:13,color:"#000"}}>BX</div>
+          <div><div style={{fontWeight:800,fontSize:16}}>{bt?.n||"TAG Box"}</div>
+            <div style={{fontSize:11,color:T.t3}}>{mat?.n} · {L}×{W}×{H}mm</div></div>
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          <button onClick={()=>setDk(!dk)} style={{width:36,height:36,borderRadius:18,background:T.c2,border:"none",fontSize:17}}>{dk?"☀️":"🌙"}</button>
+          <button onClick={()=>setSheet("export")} style={{height:36,padding:"0 16px",borderRadius:18,background:`linear-gradient(135deg,${T.ac},${T.ac2})`,border:"none",fontWeight:800,fontSize:13,color:"#000"}}>Export</button>
+        </div>
+      </div>
+
+      {/* Quick cost bar */}
+      {unitCost&&<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 16px",marginBottom:2}}>
+        <div style={{display:"flex",gap:12}}>
+          <span style={{fontSize:11,color:T.t3}}>Unit: <b style={{color:T.gn}}>${unitCost}</b></span>
+          {bct&&<span style={{fontSize:11,color:T.t3}}>BCT: <b style={{color:T.gn}}>{bct.s}N</b></span>}
+          <span style={{fontSize:11,color:T.t3}}>Segs: <b>{result?.segments.length||0}</b></span>
+        </div>
+        <button onClick={()=>setSheet("quote")} style={{fontSize:11,color:T.ac,background:"none",border:"none",fontWeight:700}}>Details →</button>
+      </div>}
+
+      {/* Content */}
+      <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+
+        {tab==="design"&&<div style={{flex:1,overflow:"auto",padding:"0 16px 16px",WebkitOverflowScrolling:"touch"}}>
+          <Dim label="LENGTH" k="L"/><Dim label="WIDTH" k="W"/><Dim label="HEIGHT" k="H"/>
+          <button onClick={resetDims} style={{width:"100%",padding:12,borderRadius:12,background:T.c2,border:`1px solid ${T.bd}`,color:T.t2,fontSize:13,fontWeight:600,marginBottom:16}}>↺ Reset Dimensions</button>
+          {!valid.ok&&<div style={{padding:14,borderRadius:14,background:T.rd+"15",border:`1px solid ${T.rd}33`,marginBottom:12}}>
+            {valid.e.map((e,i)=><div key={i} style={{color:T.rd,fontSize:13,fontWeight:600}}>✗ {e}</div>)}</div>}
+
+          <div style={{fontWeight:800,fontSize:13,color:T.t3,marginBottom:6,letterSpacing:1}}>MATERIAL</div>
+          <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,marginBottom:12,WebkitOverflowScrolling:"touch"}}>
+            {MATS.map(m=><button key={m.id} onClick={()=>setMatId(m.id)} style={{flexShrink:0,padding:"10px 16px",borderRadius:12,background:matId===m.id?T.ac+"20":T.c1,border:`2px solid ${matId===m.id?T.ac:T.bd}`,minWidth:90}}>
+              <div style={{fontWeight:700,fontSize:13,color:matId===m.id?T.ac:T.tx}}>{m.n}</div>
+              <div style={{fontSize:11,color:T.t3,marginTop:2}}>{m.t}mm</div>
+            </button>)}</div>
+
+          <div style={{fontWeight:800,fontSize:13,color:T.t3,marginBottom:6,letterSpacing:1}}>BOX TYPE</div>
+          <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,marginBottom:8,WebkitOverflowScrolling:"touch"}}>
+            <button onClick={()=>setCatF(null)} style={{flexShrink:0,padding:"7px 14px",borderRadius:20,background:!catF?T.ac:"transparent",border:`1px solid ${!catF?T.ac:T.bd}`,color:!catF?"#000":T.t2,fontSize:12,fontWeight:700}}>All</button>
+            {CATS.map(c=><button key={c.id} onClick={()=>setCatF(catF===c.id?null:c.id)} style={{flexShrink:0,padding:"7px 14px",borderRadius:20,background:catF===c.id?T.ac:"transparent",border:`1px solid ${catF===c.id?T.ac:T.bd}`,color:catF===c.id?"#000":T.t2,fontSize:12,fontWeight:600}}>{c.i} {c.n}</button>)}</div>
+          {fBoxes.map(b=>{const sel=boxId===b.id;return <button key={b.id} onClick={()=>changeBox(b.id)}
+            style={{display:"flex",alignItems:"center",gap:14,padding:16,borderRadius:16,background:sel?T.ac+"12":T.c1,border:`2px solid ${sel?T.ac:T.bd}`,width:"100%",marginBottom:8,textAlign:"left"}}>
+            <div style={{width:40,height:40,borderRadius:12,background:sel?T.ac+"22":T.c2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{CATS.find(x=>x.id===b.c)?.i}</div>
+            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:15,color:sel?T.ac:T.tx}}>{b.n}</div>
+              <div style={{fontSize:12,color:T.t3}}>{b.s} — {b.d}</div></div>
+            {sel&&<div style={{width:28,height:28,borderRadius:14,background:T.ac,display:"flex",alignItems:"center",justifyContent:"center",color:"#000",fontWeight:900,fontSize:14}}>✓</div>}
+          </button>})}
+        </div>}
+
+        {tab==="preview"&&<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div style={{display:"flex",gap:6,padding:"6px 16px",flexShrink:0}}>
+            {[["2d","2D Dieline"],["3d","3D Interactive"]].map(([k,l])=><button key={k} onClick={()=>setPm(k)}
+              style={{flex:1,padding:12,borderRadius:12,background:pm===k?T.ac:T.c2,border:"none",color:pm===k?"#000":T.t2,fontSize:15,fontWeight:700}}>{l}</button>)}</div>
+          <div ref={canvasRef} style={{flex:1,overflow:"hidden",margin:"6px 12px 8px",borderRadius:16,border:`1px solid ${T.bd}`,position:"relative"}}>
+            {!result?<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",color:T.t3}}>Fix dimensions to preview</div>
+            :pm==="2d"?(()=>{const{segments:ss,width:ww,height:hh}=result;const p=10;const dm={cut:"none",fold:"6,3",crease:"8,3,2,3",glue:"3,3",perf:"2,4",tongue:"4,2",groove:"2,2,6,2"};const sw={cut:1.2,fold:.7,crease:.5,glue:.5,perf:.6,tongue:1,groove:.8};
+              return <svg viewBox={`${-p} ${-p} ${ww+p*2} ${hh+p*2}`} style={{width:"100%",height:"100%",background:T.cv}}>
+                <defs><pattern id="gr" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke={T.bd} strokeWidth=".15"/></pattern></defs>
+                <rect x={-p*4} y={-p*4} width={(ww+p*2)*4} height={(hh+p*2)*4} fill="url(#gr)"/>
+                {ss.map((s,i)=><line key={i} x1={s.x1} y1={hh-s.y1} x2={s.x2} y2={hh-s.y2} stroke={LC[s.type]} strokeWidth={sw[s.type]||.6} strokeDasharray={dm[s.type]} strokeLinecap="round"/>)}
+                <text x={ww/2} y={hh+p-1} textAnchor="middle" fill={T.ac} fontSize="5" fontFamily="monospace">{ww.toFixed(0)}×{hh.toFixed(0)}mm</text></svg>})()
+            :(()=>{const sc=Math.min(110/Math.max(L,W,H),.45)*zm,sl=L*sc,sw=W*sc,sh=H*sc,cx=200,cy=175;
+              const cX=Math.cos(rot.x*Math.PI/180),sX=Math.sin(rot.x*Math.PI/180),cY=Math.cos(rot.y*Math.PI/180),sY=Math.sin(rot.y*Math.PI/180);
+              const proj=(x,y,z)=>{const x1=x*cY-z*sY,z1=x*sY+z*cY,y1=y*cX-z1*sX,z2=y*sX+z1*cX;return{px:cx+x1*400/(400+z2),py:cy-y1*400/(400+z2),z:z2}};
+              const V=[[-sl/2,-sh/2,-sw/2],[sl/2,-sh/2,-sw/2],[sl/2,sh/2,-sw/2],[-sl/2,sh/2,-sw/2],[-sl/2,-sh/2,sw/2],[sl/2,-sh/2,sw/2],[sl/2,sh/2,sw/2],[-sl/2,sh/2,sw/2]];
+              const F=[[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[3,2,6,7],[4,5,1,0]];
+              const pv=V.map(v=>proj(v[0],v[1],v[2]));
+              const fd=F.map(f=>{const pts=f.map(vi=>pv[vi]);const v1={x:pts[1].px-pts[0].px,y:pts[1].py-pts[0].py};const v2={x:pts[3].px-pts[0].px,y:pts[3].py-pts[0].py};const cr=v1.x*v2.y-v1.y*v2.x;return{pts,avgZ:pts.reduce((s,p)=>s+p.z,0)/4,alpha:Math.min(.5,Math.abs(cr)/(Math.max(sl,sw,sh)*60+1)*.6+.05),cross:cr}}).sort((a,b)=>a.avgZ-b.avgZ);
+              const E=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+              const mB=proj(0,-sh/2-18,0),mS=proj(sl/2+18,0,0),mL=proj(-sl/2-18,0,0);
+              return <svg viewBox="0 0 400 350" style={{width:"100%",height:"100%",background:T.cv,touchAction:"none"}}>
+                <rect width="400" height="350" fill={T.cv}/>
+                <ellipse cx={cx} cy={cy+sh/2*zm+20} rx={sl*.6} ry={sw*.15} fill={T.ac} fillOpacity=".06"/>
+                {fd.filter(f=>f.cross>0).map((f,i)=><polygon key={i} points={f.pts.map(p=>`${p.px},${p.py}`).join(" ")} fill={`rgba(245,158,11,${f.alpha.toFixed(2)})`} stroke={T.ac} strokeWidth=".8" strokeOpacity=".5"/>)}
+                {E.map((e,i)=><line key={i} x1={pv[e[0]].px} y1={pv[e[0]].py} x2={pv[e[1]].px} y2={pv[e[1]].py} stroke={T.ac} strokeWidth="1.2" strokeOpacity=".65"/>)}
+                <text x={mB.px} y={mB.py+14} textAnchor="middle" fill={T.t2} fontSize="13" fontFamily="monospace" fontWeight="800">{L}mm</text>
+                <text x={mS.px+10} y={mS.py} fill={T.t2} fontSize="13" fontFamily="monospace" fontWeight="800">{H}mm</text>
+                <text x={mL.px-10} y={mL.py} textAnchor="end" fill={T.t2} fontSize="13" fontFamily="monospace" fontWeight="800">{W}mm</text>
+                <text x={200} y={338} textAnchor="middle" fill={T.t3} fontSize="11" fontFamily="monospace">Drag to orbit · Pinch to zoom · {(zm*100).toFixed(0)}%</text></svg>})()}
+          </div>
+          {result&&<div style={{display:"flex",gap:8,padding:"0 16px 6px",overflowX:"auto",flexShrink:0}}>
+            {Object.entries(LC).filter(([t])=>segC[t]).map(([t,c])=><div key={t} style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+              <div style={{width:14,height:3,borderRadius:2,background:c}}/><span style={{fontSize:11,color:T.t3}}>{LL[t]} {segC[t]}</span></div>)}</div>}
+        </div>}
+
+        {tab==="specs"&&<div style={{flex:1,overflow:"auto",padding:"0 16px 16px"}}>
+          <div style={{fontWeight:800,fontSize:20,color:T.ac,marginBottom:2}}>{bt?.n}</div>
+          <div style={{fontSize:13,color:T.t2,marginBottom:16}}>{bt?.s} — {bt?.d}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+            {[["L",`${L}mm`],["W",`${W}mm`],["H",`${H}mm`],["Vol",`${((L*W*H)/1e6).toFixed(2)}L`],["Mat",mat?.n],["T",`${mt}mm`]].map(([l,v])=>
+              <div key={l} style={{padding:14,borderRadius:14,background:T.c1,border:`1px solid ${T.bd}`}}>
+                <div style={{fontSize:11,color:T.t3,fontWeight:600}}>{l}</div><div style={{fontSize:17,fontWeight:800,fontFamily:"monospace",marginTop:3}}>{v}</div></div>)}</div>
+          {result&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+            {[["Sheet",`${result.width.toFixed(0)}×${result.height.toFixed(0)}`],["Segments",result.segments.length],
+              ["Weight",`${(result.width*result.height/1e6*mat?.gsm).toFixed(0)}g`],["BCT",bct?`${bct.s}N`:"—"]].map(([l,v])=>
+              <div key={l} style={{padding:14,borderRadius:14,background:T.c1,border:`1px solid ${T.bd}`}}>
+                <div style={{fontSize:11,color:T.t3,fontWeight:600}}>{l}</div><div style={{fontSize:17,fontWeight:800,fontFamily:"monospace",color:T.gn,marginTop:3}}>{v}</div></div>)}</div>}
+          {result&&<div style={{borderRadius:14,overflow:"hidden",border:`1px solid ${T.bd}`}}>
+            {Object.entries(segC).map(([t,c],i)=><div key={t} style={{display:"flex",justifyContent:"space-between",padding:"12px 16px",background:i%2?T.c1:T.c2,borderBottom:`1px solid ${T.bd}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:16,height:4,borderRadius:2,background:LC[t]}}/><span style={{fontSize:13,color:T.t2}}>{LL[t]}</span></div>
+              <span style={{fontSize:13,fontWeight:700,fontFamily:"monospace"}}>{c}</span></div>)}</div>}
+        </div>}
+
+        {tab==="more"&&<div style={{flex:1,overflow:"auto",padding:"0 16px 16px"}}>
+          {/* AI Section */}
+          <div style={{fontWeight:800,fontSize:13,color:T.pu,marginBottom:8,letterSpacing:1}}>🤖 AI TOOLS</div>
+          <input ref={aiFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={e=>handleAI(e,"pdf")} style={{display:"none"}}/>
+          <input ref={aiImgRef} type="file" accept="image/*" capture="environment" onChange={e=>handleAI(e,"img")} style={{display:"none"}}/>
+          <button onClick={()=>aiFileRef.current?.click()} disabled={aiLoading}
+            style={{width:"100%",padding:16,borderRadius:14,background:T.pu+"15",border:`2px solid ${T.pu}44`,marginBottom:8,textAlign:"left"}}>
+            <div style={{fontWeight:700,fontSize:15,color:T.pu}}>{aiLoading?"⏳ Analyzing...":"📄 Upload Spec Sheet"}</div>
+            <div style={{fontSize:12,color:T.t3,marginTop:2}}>PDF or image — AI extracts dimensions</div></button>
+          <button onClick={()=>aiImgRef.current?.click()} disabled={aiLoading}
+            style={{width:"100%",padding:16,borderRadius:14,background:T.pk+"15",border:`2px solid ${T.pk}44`,marginBottom:8,textAlign:"left"}}>
+            <div style={{fontWeight:700,fontSize:15,color:T.pk}}>{aiLoading?"⏳ Classifying...":"📷 Photo a Box"}</div>
+            <div style={{fontSize:12,color:T.t3,marginTop:2}}>Camera identifies type + estimates size</div></button>
+
+          {aiResult&&!aiResult.error&&<div style={{padding:14,borderRadius:14,background:T.gn+"15",border:`2px solid ${T.gn}33`,marginBottom:12}}>
+            <div style={{fontWeight:700,color:T.gn,marginBottom:6}}>✓ AI Result</div>
+            {aiResult.box_type&&<div style={{fontSize:13,color:T.t2}}>Type: <b style={{color:T.ac}}>{aiResult.box_type}</b></div>}
+            <div style={{fontSize:13,color:T.t2}}>Size: <b>{aiResult.length_mm}×{aiResult.width_mm}×{aiResult.height_mm}mm</b></div>
+            {aiResult.confidence&&<div style={{fontSize:13,color:T.t2}}>Confidence: <b style={{color:aiResult.confidence==="high"?T.gn:T.ac}}>{aiResult.confidence}</b></div>}
+            {aiResult.notes&&<div style={{fontSize:12,color:T.t3,marginTop:4}}>{aiResult.notes}</div>}
+            <button onClick={()=>{if(aiResult.length_mm>0)setDims({L:Math.round(aiResult.length_mm),W:Math.round(aiResult.width_mm),H:Math.round(aiResult.height_mm)});setTab("design")}}
+              style={{width:"100%",marginTop:8,padding:10,borderRadius:10,background:T.gn,border:"none",color:"#fff",fontWeight:700,fontSize:13}}>Apply & Go to Design</button>
+          </div>}
+          {aiResult?.error&&<div style={{padding:12,borderRadius:12,background:T.rd+"15",border:`1px solid ${T.rd}33`,marginBottom:12,color:T.rd,fontSize:13}}>Error: {aiResult.error}</div>}
+
+          <div style={{fontWeight:800,fontSize:13,color:T.t3,marginBottom:8,marginTop:8,letterSpacing:1}}>SETTINGS</div>
+          {[{i:"🎨",l:"Theme",d:dk?"Dark":"Light",f:()=>setDk(!dk)},
+            {i:"💰",l:"Quote Details",d:unitCost?`$${unitCost}/unit`:"—",f:()=>setSheet("quote")},
+            {i:"📐",l:"All Materials",d:`${MATS.length} options`,f:()=>setSheet("material")},
+            {i:"📊",l:"Structural Data",d:bct?`BCT: ${bct.v}N`:"—",f:()=>setSheet("struct")},
+          ].map(x=><button key={x.l} onClick={x.f} style={{display:"flex",alignItems:"center",gap:14,padding:16,borderRadius:16,background:T.c1,border:`1px solid ${T.bd}`,width:"100%",marginBottom:8,textAlign:"left"}}>
+            <span style={{fontSize:22}}>{x.i}</span>
+            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:15}}>{x.l}</div><div style={{fontSize:12,color:T.t3}}>{x.d}</div></div>
+            <span style={{color:T.t3,fontSize:20}}>›</span></button>)}
+        </div>}
+      </div>
+
+      {/* Bottom Tab Bar */}
+      <div style={{display:"flex",background:T.bar,borderTop:`1px solid ${T.bd}`,backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",flexShrink:0,
+        paddingBottom:`max(4px,env(safe-area-inset-bottom))`}}>
+        {[{id:"design",i:"✏️",l:"Design"},{id:"preview",i:"👁",l:"Preview"},{id:"specs",i:"📋",l:"Specs"},{id:"more",i:"⚙️",l:"More"}].map(t=>
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0 6px",background:"none",border:"none",color:tab===t.id?T.ac:T.t3}}>
+            <span style={{fontSize:24}}>{t.i}</span>
+            <span style={{fontSize:10,fontWeight:tab===t.id?800:500}}>{t.l}</span></button>)}</div>
+
+      {/* Sheets */}
+      {sheet==="export"&&<Sheet title="Export Dieline" onClose={()=>setSheet(null)}>
+        {!result?<div style={{textAlign:"center",padding:20,color:T.t3}}>Fix dimensions first</div>:
+        [{f:"dxf",i:"📐",l:"DXF File",d:"For CAD & die-cutting machines"},{f:"svg",i:"🖼",l:"SVG Vector",d:"For review, print & web"}].map(x=>
+          <button key={x.f} onClick={()=>{doExport(x.f);setSheet(null)}} style={{display:"flex",alignItems:"center",gap:16,padding:18,borderRadius:16,background:T.c2,border:`1px solid ${T.bd}`,width:"100%",marginBottom:10,textAlign:"left"}}>
+            <span style={{fontSize:30}}>{x.i}</span>
+            <div><div style={{fontWeight:700,fontSize:16}}>{x.l}</div><div style={{fontSize:12,color:T.t3}}>{x.d}</div></div></button>)}
+      </Sheet>}
+
+      {sheet==="material"&&<Sheet title="Materials" onClose={()=>setSheet(null)}>
+        {MATS.map(m=><button key={m.id} onClick={()=>{setMatId(m.id);setSheet(null)}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:16,borderRadius:14,background:matId===m.id?T.ac+"15":T.c2,border:`2px solid ${matId===m.id?T.ac:T.bd}`,width:"100%",marginBottom:8,textAlign:"left"}}>
+          <div><div style={{fontWeight:700,fontSize:15,color:matId===m.id?T.ac:T.tx}}>{m.n}</div>
+            <div style={{fontSize:12,color:T.t3}}>{m.d} · {m.t}mm · {m.gsm}gsm</div></div>
+          {matId===m.id&&<span style={{color:T.ac,fontSize:20,fontWeight:900}}>✓</span>}
+        </button>)}
+      </Sheet>}
+
+      {sheet==="quote"&&<Sheet title="Quick Quote" onClose={()=>setSheet(null)}>
+        {result?<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {[["Unit Cost",`$${unitCost}`],["Per 1,000",`$${(parseFloat(unitCost)*1000).toFixed(0)}`],
+            ["Weight",`${(result.width*result.height/1e6*mat?.gsm).toFixed(0)}g`],["Sheet",`${(result.width*result.height/100).toFixed(0)}cm²`],
+            ["Die Saved","$750/iter"],["Material",mat?.n]].map(([l,v])=>
+            <div key={l} style={{padding:16,borderRadius:14,background:T.c2,textAlign:"center"}}>
+              <div style={{fontSize:11,color:T.t3}}>{l}</div><div style={{fontSize:20,fontWeight:800,color:T.gn,fontFamily:"monospace",marginTop:4}}>{v}</div></div>)}
+        </div>:<div style={{textAlign:"center",color:T.t3,padding:20}}>Generate a design first</div>}
+      </Sheet>}
+
+      {sheet==="struct"&&bct&&<Sheet title="Structural Analysis" onClose={()=>setSheet(null)}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+          {[["BCT",`${bct.v}N`],["Safe Load",`${bct.s}N`],["ECT",`${mat?.ect}kN/m`],["Perimeter",`${(2*(L+W))}mm`]].map(([l,v])=>
+            <div key={l} style={{padding:18,borderRadius:16,background:T.c2,textAlign:"center"}}>
+              <div style={{fontSize:11,color:T.t3}}>{l}</div><div style={{fontSize:24,fontWeight:900,color:T.gn,fontFamily:"monospace",marginTop:4}}>{v}</div></div>)}
+        </div>
+        <div style={{padding:16,borderRadius:14,background:T.c2,fontSize:13,color:T.t2,lineHeight:1.8}}>
+          <b>McKee Formula:</b> BCT = 5.87 × ECT × √(Z × P)<br/>
+          ECT = {mat?.ect} kN/m · Z = {mt}mm · P = {2*(L+W)}mm</div>
+      </Sheet>}
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
