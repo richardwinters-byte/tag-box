@@ -6,29 +6,30 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#040810">
-<title>TAG Box Converter v7</title>
+<title>TAG Box Converter</title>
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23f59e0b' width='100' height='100' rx='20'/><text x='50' y='68' text-anchor='middle' font-size='50' font-weight='900' fill='%23040810'>BX</text></svg>">
-<script>/* suppress babel warning */const _cw=console.warn;console.warn=function(...a){if(a[0]&&typeof a[0]==='string'&&a[0].includes('Babel'))return;_cw.apply(console,a)}</script>
+<script>const _cw=console.warn;console.warn=function(...a){if(a[0]&&typeof a[0]==='string'&&a[0].includes('Babel'))return;_cw.apply(console,a)}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 <style>
-*{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
-html,body,#root{margin:0;padding:0;height:100%;width:100%;overflow:hidden;font-family:'DM Sans',system-ui,-apple-system,sans-serif;background:#040810;color:#e2e8f0}
-body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
-input[type=number]{-moz-appearance:textfield}
-input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-input[type=range]{-webkit-appearance:none;height:6px;border-radius:3px;outline:none}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;cursor:pointer}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:2px}
+*{-webkit-tap-highlight-color:transparent;box-sizing:border-box;margin:0;padding:0}
+html,body,#root{height:100%;width:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;background:#040810;color:#e2e8f0}
+body{padding-top:env(safe-area-inset-top)}
+input[type=number]{-moz-appearance:textfield;font-family:'SF Mono',ui-monospace,monospace}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+input[type=range]{-webkit-appearance:none;height:6px;border-radius:3px;background:#1e293b;outline:none;width:100%}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#f59e0b;border:3px solid #040810}
+::-webkit-scrollbar{display:none}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sheet-anim{animation:sheetUp .25s ease-out}
 </style>
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel" data-type="module">
-const { useState, useMemo, useCallback, useRef, useEffect } = React;
+<script type="text/babel">
+const{useState,useMemo,useCallback,useRef,useEffect}=React;
+
 
 // ═══════════════════════════════════════════════════════════════
 // THEME SYSTEM — Light + Dark
@@ -674,868 +675,350 @@ async function deleteDesign(key){try{localStorage.removeItem(key)}catch(e){}}
 // ═══════════════════════════════════════════════════════════════
 // 3D INTERACTIVE
 // ═══════════════════════════════════════════════════════════════
-function Interactive3D({L,W,H,T,boxId}){
-  const ref=useRef(null);const[rot,setRot]=useState({x:-25,y:35});const[zm,setZm]=useState(1);
-  const drag=useRef(null);const pinch=useRef(null);
+
+
+// ═══ MOBILE APP ═══
+function App(){
+  const[dk,setDk]=useState(true);
+  const[tab,setTab]=useState("design");
+  const[boxId,setBoxId]=useState("0201");
+  const[dims,setDims]=useState({L:300,W:200,H:150});
+  const[matId,setMatId]=useState("B");
+  const[selFins,setSelFins]=useState([]);
+  const[catF,setCatF]=useState(null);
+  const[pm,setPm]=useState("2d");
+  const[sheet,setSheet]=useState(null);
+  const[rot,setRot]=useState({x:-25,y:35});
+  const[zm,setZm]=useState(1);
+  const[bk,setBK]=useState(0.3);
+  const[ba,setBA]=useState(90);
+  const[bt2,setBT]=useState("rotary");
+  const[qty,setQty]=useState(1000);
+  const[aiLoading,setAiLoading]=useState(false);
+  const[aiResult,setAiResult]=useState(null);
+  const[saved,setSaved]=useState([]);
+  const canvasRef=useRef(null);
+  const touchRef=useRef(null);
+  const pinchRef=useRef(null);
+  const aiFileRef=useRef(null);
+  const aiImgRef=useRef(null);
+
+  const T_=dk?DARK:LIGHT;
+  const mat=MATS.find(m=>m.id===matId);const mT=mat?.t||3;
+  const{L,W,H}=dims;const blade={kerf:bk,angle:ba,type:bt2};
+  const bt=BOXES.find(b=>b.id===boxId);
+  const cat=bt?.cat||"slotted";
+
+  const v=useMemo(()=>validate(boxId,L,W,H,mT,matId),[boxId,L,W,H,mT,matId]);
+  const r=useMemo(()=>v.valid?generate(boxId,L,W,H,mT,blade):null,[boxId,L,W,H,mT,bk,ba,v.valid]);
+  const segC=useMemo(()=>{if(!r)return{};const c={};r.segments.forEach(s=>{c[s.type]=(c[s.type]||0)+1});return c},[r]);
+  const segLens=useMemo(()=>{if(!r)return{};const l={};r.segments.forEach(s=>{const len=Math.sqrt((s.x2-s.x1)**2+(s.y2-s.y1)**2);l[s.type]=(l[s.type]||0)+len});return l},[r]);
+  const totalCutLen=useMemo(()=>Object.values(segLens).reduce((s,v)=>s+v,0),[segLens]);
+  const bctData=useMemo(()=>calcBCT(L,W,H,mat),[L,W,H,mat]);
+  const quote=useMemo(()=>calcQuote(r,mat,selFins,qty),[r,mat,selFins,qty]);
+  const unitCost=quote?.unitCost||null;
+
+  useEffect(()=>{loadDesigns().then(d=>setSaved(d))},[]);
+
+  const changeBox=useCallback(id=>{setBoxId(id);const b=BOXES.find(x=>x.id===id);if(b)setDims({L:b.dL,W:b.dW,H:b.dH})},[]);
+  const resetDims=useCallback(()=>{if(bt)setDims({L:bt.dL,W:bt.dW,H:bt.dH})},[bt]);
+  const doExport=useCallback(f=>{const n=boxId+"_"+L+"x"+W+"x"+H;
+    if(f==="dxf"&&r)dl(makeDXF(r,blade),n+".dxf","application/dxf");
+    if(f==="svg"&&r)dl(makeSVG(r),n+".svg","image/svg+xml");
+    if(f==="cff2"&&r)dl(makeCFF2(r,blade,boxId,{L,W,H}),n+".cf2","application/octet-stream");
+    if(f==="pdf"&&r)dl(makePrintSVG(r),n+"_print.svg","image/svg+xml");
+    if(f==="spec-pdf")dl(makeSpecPDF(bt,L,W,H,mT,mat,r,quote,bctData,segC,segLens,selFins,FINS,blade),n+"_spec.svg","image/svg+xml");
+    if(f==="struct-pdf")dl(makeStructPDF(bt,L,W,H,mT,mat,bctData),n+"_structural.svg","image/svg+xml");
+  },[r,bt,L,W,H,mT,blade,boxId,mat,quote,bctData,segC,segLens,selFins]);
+  const handleSave=useCallback(async()=>{await saveDesign(bt?.name+" "+L+"x"+W+"x"+H,{boxType:boxId,dims,matId,selFins,bk,ba,bt2});setSaved(await loadDesigns())},[bt,L,W,H,boxId,dims,matId,selFins,bk,ba,bt2]);
+
+  const fBoxes=useMemo(()=>catF?BOXES.filter(b=>b.cat===catF):BOXES,[catF]);
+
+  // ── 3D Touch: native addEventListener, passive:false, refs for stable handlers ──
   const rotRef=useRef(rot);rotRef.current=rot;
   const zmRef=useRef(zm);zmRef.current=zm;
-  const onD=useCallback(e=>{e.preventDefault();drag.current={x:e.clientX,y:e.clientY,rx:rotRef.current.x,ry:rotRef.current.y}},[]);
-  const onM=useCallback(e=>{if(!drag.current)return;setRot({x:drag.current.rx+(e.clientY-drag.current.y)*.4,y:drag.current.ry+(e.clientX-drag.current.x)*.4})},[]);
-  const onU=useCallback(()=>{drag.current=null;pinch.current=null},[]);
-  useEffect(()=>{const el=ref.current;if(!el)return;
-    const onW=e=>{e.preventDefault();setZm(z=>Math.max(.3,Math.min(4,z-e.deltaY*.002)))};
-    const onTS=e=>{if(e.touches.length===1){const t=e.touches[0];drag.current={x:t.clientX,y:t.clientY,rx:rotRef.current.x,ry:rotRef.current.y}}
-      if(e.touches.length===2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);pinch.current={d,z:zmRef.current}}};
+  useEffect(()=>{
+    const el=canvasRef.current;if(!el)return;
+    const onTS=e=>{
+      if(e.touches.length===1){const t=e.touches[0];touchRef.current={x:t.clientX,y:t.clientY,rx:rotRef.current.x,ry:rotRef.current.y}}
+      if(e.touches.length===2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);pinchRef.current={d,z:zmRef.current}}};
     const onTM=e=>{e.preventDefault();
-      if(e.touches.length===1&&drag.current){const t=e.touches[0];setRot({x:drag.current.rx+(t.clientY-drag.current.y)*.4,y:drag.current.ry+(t.clientX-drag.current.x)*.4})}
-      if(e.touches.length===2&&pinch.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);setZm(Math.max(.3,Math.min(4,pinch.current.z*(d/pinch.current.d))))}};
-    const onTE=()=>{drag.current=null;pinch.current=null};
-    el.addEventListener("wheel",onW,{passive:false});el.addEventListener("touchstart",onTS,{passive:false});
-    el.addEventListener("touchmove",onTM,{passive:false});el.addEventListener("touchend",onTE,{passive:true});
-    return()=>{el.removeEventListener("wheel",onW);el.removeEventListener("touchstart",onTS);el.removeEventListener("touchmove",onTM);el.removeEventListener("touchend",onTE)}},[]);
+      if(e.touches.length===1&&touchRef.current){const t=e.touches[0];setRot({x:touchRef.current.rx+(t.clientY-touchRef.current.y)*.4,y:touchRef.current.ry+(t.clientX-touchRef.current.x)*.4})}
+      if(e.touches.length===2&&pinchRef.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);setZm(Math.max(.3,Math.min(4,pinchRef.current.z*(d/pinchRef.current.d))))}};
+    const onTE=()=>{touchRef.current=null;pinchRef.current=null};
+    const onWh=e=>{e.preventDefault();setZm(z=>Math.max(.3,Math.min(4,z-e.deltaY*.002)))};
+    el.addEventListener("touchstart",onTS,{passive:false});
+    el.addEventListener("touchmove",onTM,{passive:false});
+    el.addEventListener("touchend",onTE,{passive:true});
+    el.addEventListener("wheel",onWh,{passive:false});
+    return()=>{el.removeEventListener("touchstart",onTS);el.removeEventListener("touchmove",onTM);el.removeEventListener("touchend",onTE);el.removeEventListener("wheel",onWh)};
+  },[]);
 
-  const sc=Math.min(110/Math.max(L,W,H),.45)*zm,sl=L*sc,sw=W*sc,sh=H*sc,cx=200,cy=175;
-  const cX=Math.cos(rot.x*Math.PI/180),sX=Math.sin(rot.x*Math.PI/180),cY=Math.cos(rot.y*Math.PI/180),sY=Math.sin(rot.y*Math.PI/180);
-  const proj=(x,y,z)=>{const x1=x*cY-z*sY,z1=x*sY+z*cY,y1=y*cX-z1*sX,z2=y*sX+z1*cX;return{px:cx+x1*400/(400+z2),py:cy-y1*400/(400+z2),z:z2}};
+  // AI handler
+  const handleAI=useCallback(async(e,type)=>{
+    const file=e.target.files?.[0];if(!file)return;setAiLoading(true);setAiResult(null);
+    try{const b64=await new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result.split(",")[1]);rd.onerror=()=>j("fail");rd.readAsDataURL(file)});
+      const isPDF=file.type==="application/pdf";
+      const prompt=type==="pdf"
+        ?"Analyze this spec sheet for a box. Extract dimensions and box type. Respond ONLY with JSON: {\"length_mm\":number,\"width_mm\":number,\"height_mm\":number,\"box_type\":\"FEFCO code\",\"confidence\":\"high/medium/low\",\"notes\":\"observations\"}"
+        :"Analyze this photo of a box. Identify FEFCO type and estimate dimensions in mm. Respond ONLY with JSON: {\"box_type\":\"FEFCO code\",\"length_mm\":number,\"width_mm\":number,\"height_mm\":number,\"material_guess\":\"type\",\"confidence\":\"high/medium/low\",\"notes\":\"observations\"}";
+      const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:[
+          {type:isPDF?"document":"image",source:{type:"base64",media_type:file.type,data:b64}},{type:"text",text:prompt}]}]})});
+      const data=await resp.json();const txt=data.content?.find(c=>c.type==="text")?.text||"";
+      const parsed=JSON.parse(txt.replace(/```json|```/g,"").trim());
+      setAiResult(parsed);
+      if(parsed.length_mm>0)setDims({L:Math.round(parsed.length_mm),W:Math.round(parsed.width_mm),H:Math.round(parsed.height_mm)});
+      const mb=BOXES.find(b=>b.id===parsed.box_type);if(mb)setBoxId(mb.id);
+    }catch(err){setAiResult({error:err.toString()})}finally{setAiLoading(false);if(e.target)e.target.value=""}
+  },[]);
 
-  // ── Box-type-specific 3D mesh generation ──
-  const cat=BOXES.find(b=>b.id===boxId)?.cat||"slotted";
-  const meshes=useMemo(()=>{
+  // ── Components ──
+  const S=T_; // theme shorthand
+  const Dim=({label,k})=>(
+    <div style={{background:S.bg2||S.c1,borderRadius:14,border:"1px solid "+(S.bd),padding:"12px 16px",marginBottom:8}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+        <span style={{fontSize:12,fontWeight:700,color:S.tm,letterSpacing:1}}>{label}</span><span style={{fontSize:11,color:S.tm}}>mm</span></div>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <button onClick={()=>setDims(d=>({...d,[k]:Math.max(0,d[k]-5)}))}
+          style={{width:44,height:44,borderRadius:12,background:S.bg3||S.c2,border:"1px solid "+S.bd,color:S.ac,fontSize:22,fontWeight:700,flexShrink:0}}>−</button>
+        <input type="number" value={dims[k]} onChange={e=>setDims(d=>({...d,[k]:Math.max(0,parseFloat(e.target.value)||0)}))}
+          style={{flex:1,background:"none",border:"none",color:S.tx,fontSize:28,fontWeight:800,textAlign:"center",outline:"none"}}/>
+        <button onClick={()=>setDims(d=>({...d,[k]:d[k]+5}))}
+          style={{width:44,height:44,borderRadius:12,background:S.bg3||S.c2,border:"1px solid "+S.bd,color:S.ac,fontSize:22,fontWeight:700,flexShrink:0}}>+</button>
+      </div></div>);
+
+  const Sheet=({title,children,onClose})=>(
+    <div style={{position:"fixed",inset:0,zIndex:200}} onClick={onClose}>
+      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.6)"}}/>
+      <div className="sheet-anim" onClick={e=>e.stopPropagation()} style={{position:"absolute",bottom:0,left:0,right:0,background:S.bg1||S.c1,borderRadius:"24px 24px 0 0",maxHeight:"82vh",display:"flex",flexDirection:"column",paddingBottom:"max(16px,env(safe-area-inset-bottom))"}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 6px"}}><div style={{width:40,height:4,borderRadius:2,background:S.bd}}/></div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 20px 12px"}}>
+          <span style={{fontWeight:800,fontSize:18,color:S.tx}}>{title}</span>
+          <button onClick={onClose} style={{width:32,height:32,borderRadius:16,background:S.bg3||S.c2,border:"none",color:S.td||S.t2,fontSize:15,fontWeight:700}}>✕</button></div>
+        <div style={{overflow:"auto",padding:"0 20px 16px",flex:1,WebkitOverflowScrolling:"touch"}}>{children}</div>
+      </div></div>);
+
+  // ── 3D Render (inline for mobile) ──
+  const render3D=()=>{
+    const sc=Math.min(110/Math.max(L,W,H),.45)*zm,sl=L*sc,sw=W*sc,sh=H*sc,cx=200,cy=170;
+    const cX=Math.cos(rot.x*Math.PI/180),sX=Math.sin(rot.x*Math.PI/180),cY=Math.cos(rot.y*Math.PI/180),sY=Math.sin(rot.y*Math.PI/180);
+    const proj=(x,y,z)=>{const x1=x*cY-z*sY,z1=x*sY+z*cY,y1=y*cX-z1*sX,z2=y*sX+z1*cX;return{px:cx+x1*400/(400+z2),py:cy-y1*400/(400+z2),z:z2}};
     const hl=sl/2,hw=sw/2,hh=sh/2;const parts=[];
     const P="rgba(245,158,11,",P2="rgba(217,119,6,",P3="rgba(180,100,6,";
     const box=(ox,oy,oz,bx,by,bz,col)=>({v:[[ox,oy,oz],[ox+bx,oy,oz],[ox+bx,oy+by,oz],[ox,oy+by,oz],[ox,oy,oz+bz],[ox+bx,oy,oz+bz],[ox+bx,oy+by,oz+bz],[ox,oy+by,oz+bz]],f:[[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[3,2,6,7],[4,5,1,0]],col});
     const openBox=(ox,oy,oz,bx,by,bz,col)=>({v:[[ox,oy,oz],[ox+bx,oy,oz],[ox+bx,oy+by,oz],[ox,oy+by,oz],[ox,oy,oz+bz],[ox+bx,oy,oz+bz],[ox+bx,oy+by,oz+bz],[ox,oy+by,oz+bz]],f:[[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[4,5,1,0]],col});
     const quad=(v,col)=>({v,f:[[0,1,2,3]],col});
     const id=boxId;
-    // Closed RSC types (assembled = closed box)
-    if(["0201","0202","0203","0204","0215","0216","0711"].includes(id)){parts.push(box(-hl,-hh,-hw,sl,sh,sw,P))}
-    // Cake box: closed + window outline
-    else if(id==="CAKEBOX"){parts.push(box(-hl,-hh,-hw,sl,sh,sw,P));const wm=hl*.3;parts.push(quad([[-hl+wm,-hh+hh*.3,-hw-.1],[hl-wm,-hh+hh*.3,-hw-.1],[hl-wm,hh-hh*.3,-hw-.1],[-hl+wm,hh-hh*.3,-hw-.1]],"rgba(100,100,100,"))}
-    // HSC: open top
-    else if(id==="0210"){parts.push(openBox(-hl,-hh,-hw,sl,sh,sw,P))}
-    // Crash+Tuck: closed with small tuck hint
+    if(["0201","0202","0203","0204","0215","0216","0711"].includes(id))parts.push(box(-hl,-hh,-hw,sl,sh,sw,P));
+    else if(id==="CAKEBOX"){parts.push(box(-hl,-hh,-hw,sl,sh,sw,P));parts.push(quad([[-hl+hl*.3,-hh+hh*.3,-hw-.1],[hl-hl*.3,-hh+hh*.3,-hw-.1],[hl-hl*.3,hh-hh*.3,-hw-.1],[-hl+hl*.3,hh-hh*.3,-hw-.1]],"rgba(100,100,100,"))}
+    else if(id==="0210")parts.push(openBox(-hl,-hh,-hw,sl,sh,sw,P));
     else if(id==="0713"){parts.push(box(-hl,-hh,-hw,sl,sh,sw,P));parts.push(quad([[-hl*.5,hh,-hw],[hl*.5,hh,-hw],[hl*.5,hh+sh*.08,-hw-sh*.06],[-hl*.5,hh+sh*.08,-hw-sh*.06]],P2))}
-    // Telescope: separate lid + base
-    else if(cat==="telescope"||id==="TG_TELESCOPE"){const bH=sh*.55,lH=sh*.4,gap=sh*.15,ex=sl*.025;parts.push(openBox(-hl,-hh,-hw,sl,bH,sw,P));parts.push(box(-hl-ex,-hh+bH+gap,-hw-ex,sl+ex*2,lH,sw+ex*2,P2))}
-    // Open trays
-    else if(id==="0401"||id==="0421"||id==="TG_TRAY"){parts.push(openBox(-hl,-hh,-hw,sl,sh,sw,P))}
-    // Hinged lid (0427): lid hinges from BACK edge upward
+    else if(cat==="telescope"){const bH=sh*.55,lH=sh*.4,gap=sh*.15,ex=sl*.025;parts.push(openBox(-hl,-hh,-hw,sl,bH,sw,P));parts.push(box(-hl-ex,-hh+bH+gap,-hw-ex,sl+ex*2,lH,sw+ex*2,P2))}
+    else if(id==="0401"||id==="0421"||id==="TG_TRAY")parts.push(openBox(-hl,-hh,-hw,sl,sh,sw,P));
     else if(id==="0427"){parts.push(openBox(-hl,-hh,-hw,sl,sh,sw,P));const la=55*Math.PI/180,ll=sw*.8;parts.push(quad([[-hl,hh,hw],[hl,hh,hw],[hl,hh+ll*Math.cos(la),hw+ll*Math.sin(la)],[-hl,hh+ll*Math.cos(la),hw+ll*Math.sin(la)]],P2))}
-    // Mailer: front panel swings FORWARD (hinged at bottom-front)
-    else if(id==="MAILER"){parts.push(openBox(-hl,-hh,-hw,sl,sh,sw,P));const fa=65*Math.PI/180,fp=sh*.85;parts.push(quad([[-hl,-hh,-hw],[hl,-hh,-hw],[hl,-hh-fp*Math.sin(fa),-hw-fp*Math.cos(fa)],[-hl,-hh-fp*Math.sin(fa),-hw-fp*Math.cos(fa)]],P2));const la=40*Math.PI/180,ll=sw*.6;parts.push(quad([[-hl,hh,hw],[hl,hh,hw],[hl,hh+ll*Math.cos(la),hw+ll*Math.sin(la)],[-hl,hh+ll*Math.cos(la),hw+ll*Math.sin(la)]],P3))}
-    // Pizza: hinged from BACK, lid swings UP
+    else if(id==="MAILER"){parts.push(openBox(-hl,-hh,-hw,sl,sh,sw,P));const fa=65*Math.PI/180,fp=sh*.85;parts.push(quad([[-hl,-hh,-hw],[hl,-hh,-hw],[hl,-hh-fp*Math.sin(fa),-hw-fp*Math.cos(fa)],[-hl,-hh-fp*Math.sin(fa),-hw-fp*Math.cos(fa)]],P2))}
     else if(id==="PIZZA"){parts.push(openBox(-hl,-hh,-hw,sl,sh,sw,P));const la=50*Math.PI/180,ll=sw*.9;parts.push(quad([[-hl,hh,hw],[hl,hh,hw],[hl,hh+ll*Math.cos(la),hw+ll*Math.sin(la)],[-hl,hh+ll*Math.cos(la),hw+ll*Math.sin(la)]],P2))}
-    // Display: low tray + tall back riser
     else if(id==="DISPLAY"){parts.push(openBox(-hl,-hh,-hw,sl,sh*.35,sw,P));parts.push(quad([[-hl,-hh+sh*.35,hw],[hl,-hh+sh*.35,hw],[hl,hh*1.3,hw],[-hl,hh*1.3,hw]],P2))}
-    // Book wrap: flat base + wings rising from LEFT/RIGHT
     else if(id==="BOOKWRAP"){const bt=sh*.15;parts.push(box(-hl,-hh,-hw,sl,bt,sw,P));const wa=55*Math.PI/180,wl=hw*1.2;parts.push(quad([[-hl,-hh+bt,-hw],[-hl,-hh+bt,hw],[-hl-wl*Math.sin(wa),-hh+bt+wl*Math.cos(wa),hw],[-hl-wl*Math.sin(wa),-hh+bt+wl*Math.cos(wa),-hw]],P2));parts.push(quad([[hl,-hh+bt,-hw],[hl,-hh+bt,hw],[hl+wl*Math.sin(wa),-hh+bt+wl*Math.cos(wa),hw],[hl+wl*Math.sin(wa),-hh+bt+wl*Math.cos(wa),-hw]],P3))}
-    // Rigid mailer: flat envelope
-    else if(id==="RIGIDMAIL"){parts.push(box(-hl,-hh*.2,-hw,sl,sh*.4,sw,P));parts.push(quad([[-hl,hh*.2,hw],[hl,hh*.2,hw],[hl,hh*.2+hw*.3,hw+hw*.2],[-hl,hh*.2+hw*.3,hw+hw*.2]],P2))}
-    // Pillow: curved tube
-    else if(id==="PILLOW"){const n=12,pts=[];for(let i=0;i<=n;i++){const t=i/n;pts.push({x:-hl+sl*t,c:Math.sin(t*Math.PI)*hh*.6})}for(let i=0;i<n;i++){parts.push(quad([[pts[i].x,-hh-pts[i].c,-hw],[pts[i+1].x,-hh-pts[i+1].c,-hw],[pts[i+1].x,hh+pts[i+1].c,-hw],[pts[i].x,hh+pts[i].c,-hw]],P));parts.push(quad([[pts[i].x,-hh-pts[i].c,hw],[pts[i+1].x,-hh-pts[i+1].c,hw],[pts[i+1].x,hh+pts[i+1].c,hw],[pts[i].x,hh+pts[i].c,hw]],P2));parts.push(quad([[pts[i].x,hh+pts[i].c,-hw],[pts[i+1].x,hh+pts[i+1].c,-hw],[pts[i+1].x,hh+pts[i+1].c,hw],[pts[i].x,hh+pts[i].c,hw]],P3))}}
-    // Hexagonal: 6-sided closed tube
+    else if(id==="RIGIDMAIL"){parts.push(box(-hl,-hh*.2,-hw,sl,sh*.4,sw,P))}
+    else if(id==="PILLOW"){const n=10,pts=[];for(let i=0;i<=n;i++){const t=i/n;pts.push({x:-hl+sl*t,c:Math.sin(t*Math.PI)*hh*.6})}for(let i=0;i<n;i++){parts.push(quad([[pts[i].x,-hh-pts[i].c,-hw],[pts[i+1].x,-hh-pts[i+1].c,-hw],[pts[i+1].x,hh+pts[i+1].c,-hw],[pts[i].x,hh+pts[i].c,-hw]],P));parts.push(quad([[pts[i].x,-hh-pts[i].c,hw],[pts[i+1].x,-hh-pts[i+1].c,hw],[pts[i+1].x,hh+pts[i+1].c,hw],[pts[i].x,hh+pts[i].c,hw]],P2))}}
     else if(id==="HEXAGON"){const r=hw*.9,n=6;const tops=[],bots=[];for(let i=0;i<n;i++){const a=i/n*Math.PI*2-Math.PI/2;tops.push([Math.cos(a)*r,hh,Math.sin(a)*r]);bots.push([Math.cos(a)*r,-hh,Math.sin(a)*r])}for(let i=0;i<n;i++){const j=(i+1)%n;parts.push(quad([bots[i],bots[j],tops[j],tops[i]],[P,P2,P3,P,P2,P3][i]))}}
-    // T&G Sleeve: drawer partially open
-    else if(id==="TG_SLEEVE"){parts.push(box(-hl,-hh,-hw,sl,sh,sw,P));parts.push(box(-hl-sl*.25,-hh*0.9,-hw*0.85,sl*0.9,sh*0.8,sw*0.85,P2))}
-    // T&G closed types
-    else if(cat==="tg"){parts.push(box(-hl,-hh,-hw,sl,sh,sw,P))}
-    // Default: closed box
-    else{parts.push(box(-hl,-hh,-hw,sl,sh,sw,P))}
-    return parts;
-  },[sl,sw,sh,cat,boxId]);
+    else if(id==="TG_SLEEVE"){parts.push(box(-hl,-hh,-hw,sl,sh,sw,P));parts.push(box(-hl-sl*.25,-hh*.9,-hw*.85,sl*.9,sh*.8,sw*.85,P2))}
+    else parts.push(box(-hl,-hh,-hw,sl,sh,sw,P));
 
-
-  // ── Render all mesh parts ──
-  const allFaces=[];const allEdges=[];
-  meshes.forEach((mesh,mi)=>{
-    const pv=mesh.v.map(v=>proj(v[0],v[1],v[2]));
-    mesh.f.forEach((f,fi)=>{
-      const pts=f.map(i=>pv[i]);
-      const v1={x:pts[1].px-pts[0].px,y:pts[1].py-pts[0].py};
-      const v2={x:pts[f.length-1].px-pts[0].px,y:pts[f.length-1].py-pts[0].py};
-      const cr=v1.x*v2.y-v1.y*v2.x;
-      const alpha=Math.min(.55,Math.abs(cr)/(80*Math.max(sl,sw,sh)+1)*.6+.04);
-      allFaces.push({pts,avgZ:pts.reduce((s,p)=>s+p.z,0)/pts.length,alpha,cross:cr,col:mesh.col||"rgba(245,158,11,"});
+    const allFaces=[];const allEdges=[];
+    parts.forEach(mesh=>{const pv=mesh.v.map(v=>proj(v[0],v[1],v[2]));
+      mesh.f.forEach(f=>{const pts=f.map(i=>pv[i]);const v1={x:pts[1].px-pts[0].px,y:pts[1].py-pts[0].py};const v2={x:pts[f.length-1].px-pts[0].px,y:pts[f.length-1].py-pts[0].py};
+        const cr=v1.x*v2.y-v1.y*v2.x;const alpha=Math.min(.55,Math.abs(cr)/(80*Math.max(sl,sw,sh)+1)*.6+.04);
+        allFaces.push({pts,avgZ:pts.reduce((s,p)=>s+p.z,0)/pts.length,alpha,cross:cr,col:mesh.col||P})});
+      if(mesh.v.length===8)[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]].forEach(([a,b])=>allEdges.push([pv[a],pv[b]]));
+      else if(mesh.v.length===4)[[0,1],[1,2],[2,3],[3,0]].forEach(([a,b])=>allEdges.push([pv[a],pv[b]]));
     });
-    // Edges for this part
-    if(mesh.v.length===8){[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]].forEach(([a,b])=>allEdges.push([pv[a],pv[b]]))}
-    else if(mesh.v.length===4){[[0,1],[1,2],[2,3],[3,0]].forEach(([a,b])=>allEdges.push([pv[a],pv[b]]))}
-  });
-  allFaces.sort((a,b)=>a.avgZ-b.avgZ);
-
-  const mB=proj(0,-sh/2-18,0),mS=proj(sl/2+18,0,0),mL=proj(-sl/2-18,0,0);
-  const typeLabel=BOXES.find(b=>b.id===boxId)?.n||"Box";
-
-  return <div ref={ref} className="w-full h-full select-none" onMouseDown={onD} onMouseMove={onM} onMouseUp={onU} onMouseLeave={onU}
-    style={{background:"#0d1117",touchAction:"none",cursor:"grab"}}>
-    <svg viewBox="0 0 400 360" className="w-full h-full" style={{pointerEvents:"none"}}>
-      <defs><radialGradient id="bg3d" cx="50%" cy="40%"><stop offset="0%" stopColor="#111827"/><stop offset="100%" stopColor="#030712"/></radialGradient></defs>
-      <rect width="400" height="360" fill="url(#bg3d)"/>
+    allFaces.sort((a,b)=>a.avgZ-b.avgZ);
+    const mB=proj(0,-sh/2-18,0),mS=proj(sl/2+18,0,0),mL=proj(-sl/2-18,0,0);
+    return <svg viewBox="0 0 400 350" style={{width:"100%",height:"100%",background:S.canvas||"#0d1117",pointerEvents:"none"}}>
+      <rect width="400" height="350" fill={S.canvas||"#0d1117"}/>
       <ellipse cx={cx} cy={cy+sh/2*zm+22} rx={sl*.6} ry={sw*.15} fill="#f59e0b" fillOpacity=".06"/>
-      {allFaces.filter(f=>f.cross>0).map((f,i)=><polygon key={i} points={f.pts.map(p=>`${p.px},${p.py}`).join(" ")} fill={`${f.col}${f.alpha.toFixed(2)})`} stroke="#f59e0b" strokeWidth=".6" strokeOpacity=".4"/>)}
-      {allEdges.map(([p1,p2],i)=><line key={`e${i}`} x1={p1.px} y1={p1.py} x2={p2.px} y2={p2.py} stroke="#f59e0b" strokeWidth="1" strokeOpacity=".55"/>)}
-      <text x={mB.px} y={mB.py+14} textAnchor="middle" fill="#94a3b8" fontSize="11" fontFamily="monospace" fontWeight="700">{L.toFixed(0)}mm</text>
-      <text x={mS.px+10} y={mS.py} fill="#94a3b8" fontSize="11" fontFamily="monospace" fontWeight="700">{H.toFixed(0)}mm</text>
-      <text x={mL.px-10} y={mL.py} textAnchor="end" fill="#94a3b8" fontSize="11" fontFamily="monospace" fontWeight="700">{W.toFixed(0)}mm</text>
-      <text x={200} y={20} textAnchor="middle" fill="#f59e0b" fontSize="12" fontFamily="sans-serif" fontWeight="700">{typeLabel}</text>
-      <text x={200} y={348} textAnchor="middle" fill="#64748b" fontSize="10" fontFamily="monospace">Drag: orbit · Scroll/Pinch: zoom · {rot.x.toFixed(0)}°/{rot.y.toFixed(0)}° · {(zm*100).toFixed(0)}%</text>
-    </svg></div>}
+      {allFaces.filter(f=>f.cross>0).map((f,i)=><polygon key={i} points={f.pts.map(p=>p.px+","+p.py).join(" ")} fill={f.col+f.alpha.toFixed(2)+")"} stroke="#f59e0b" strokeWidth=".6" strokeOpacity=".4"/>)}
+      {allEdges.map(([p1,p2],i)=><line key={"e"+i} x1={p1.px} y1={p1.py} x2={p2.px} y2={p2.py} stroke="#f59e0b" strokeWidth="1" strokeOpacity=".5"/>)}
+      <text x={mB.px} y={mB.py+14} textAnchor="middle" fill="#94a3b8" fontSize="12" fontFamily="monospace" fontWeight="700">{L}mm</text>
+      <text x={mS.px+10} y={mS.py} fill="#94a3b8" fontSize="12" fontFamily="monospace" fontWeight="700">{H}mm</text>
+      <text x={mL.px-10} y={mL.py} textAnchor="end" fill="#94a3b8" fontSize="12" fontFamily="monospace" fontWeight="700">{W}mm</text>
+      <text x={200} y={18} textAnchor="middle" fill="#f59e0b" fontSize="12" fontWeight="700">{bt?.name||"Box"}</text>
+      <text x={200} y={340} textAnchor="middle" fill="#64748b" fontSize="10" fontFamily="monospace">Drag: orbit · Pinch: zoom · {(zm*100).toFixed(0)}%</text>
+    </svg>};
 
-// ═══════════════════════════════════════════════════════════════
-// 2D PREVIEW with flute direction
-// ═══════════════════════════════════════════════════════════════
-function Preview2D({result,zoom,setZoom,T}){if(!result)return null;
-  const{segments:sg,width:ww,height:hh}=result;const p=15;
-  const dm={cut:"none",fold:"6,3",crease:"8,3,2,3",glue:"3,3",perf:"2,4",tongue:"4,2",groove:"2,2,6,2"};
-  const sw={cut:1.2,fold:.7,crease:.5,glue:.5,perf:.6,tongue:1,groove:.8};
-  const ref=useRef(null);const[hover,setHover]=useState(null);
-  useEffect(()=>{const el=ref.current;const w=e=>{e.preventDefault();setZoom(z=>Math.max(.1,Math.min(8,z-e.deltaY*.003)))};
-    if(el)el.addEventListener("wheel",w,{passive:false});return()=>{if(el)el.removeEventListener("wheel",w)}},[setZoom]);
-  // Flute direction arrows
-  const fluteArrows=[];const step=Math.max(40,Math.min(80,ww/8));
-  for(let x=step;x<ww-step/2;x+=step)for(let y=step;y<hh-step/2;y+=step)fluteArrows.push({x,y});
-
-  return <div ref={ref} className="w-full h-full" style={{cursor:"crosshair"}}>
-    <svg viewBox={`${-p} ${-p} ${(ww+p*2)/zoom} ${(hh+p*2)/zoom}`} className="w-full h-full" style={{background:"#0d1117"}}>
-      <defs><pattern id="g1" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="#151e2d" strokeWidth=".15"/></pattern>
-        <pattern id="g2" width="50" height="50" patternUnits="userSpaceOnUse"><path d="M 50 0 L 0 0 0 50" fill="none" stroke="#1a2d42" strokeWidth=".25"/></pattern></defs>
-      <rect x={-p*4} y={-p*4} width={(ww+p*2)*4} height={(hh+p*2)*4} fill="url(#g1)"/>
-      <rect x={-p*4} y={-p*4} width={(ww+p*2)*4} height={(hh+p*2)*4} fill="url(#g2)"/>
-      {/* Flute direction indicators */}
-      {fluteArrows.map((a,i)=><g key={`fa${i}`} opacity=".15">
-        <line x1={a.x} y1={hh-a.y-8} x2={a.x} y2={hh-a.y+8} stroke="#60a5fa" strokeWidth=".5"/>
-        <line x1={a.x-2} y1={hh-a.y-5} x2={a.x} y2={hh-a.y-8} stroke="#60a5fa" strokeWidth=".5"/>
-        <line x1={a.x+2} y1={hh-a.y-5} x2={a.x} y2={hh-a.y-8} stroke="#60a5fa" strokeWidth=".5"/>
-      </g>)}
-      {/* Dimension annotations */}
-      <line x1={0} y1={hh+12} x2={ww} y2={hh+12} stroke="#f59e0b" strokeWidth=".3"/>
-      <text x={ww/2} y={hh+18} textAnchor="middle" fill="#f59e0b" fontSize={4/Math.max(zoom,.5)} fontFamily="monospace">{ww.toFixed(1)}mm</text>
-      <line x1={ww+8} y1={hh} x2={ww+8} y2={0} stroke="#f59e0b" strokeWidth=".3"/>
-      <text x={ww+12} y={hh/2} fill="#f59e0b" fontSize={4/Math.max(zoom,.5)} fontFamily="monospace" transform={`rotate(-90,${ww+12},${hh/2})`} textAnchor="middle">{hh.toFixed(1)}mm</text>
-      {/* Grain direction label */}
-      <text x={ww-5} y={hh-5} textAnchor="end" fill="#60a5fa" fontSize={3/Math.max(zoom,.5)} fontFamily="monospace" opacity=".4">↑ FLUTE DIR / GRAIN</text>
-      {/* Segments */}
-      {sg.map((s,i)=><line key={i} x1={s.x1} y1={hh-s.y1} x2={s.x2} y2={hh-s.y2}
-        stroke={hover===i?"#fff":LC[s.type]} strokeWidth={(hover===i?2:1)*(sw[s.type]||.6)} strokeDasharray={dm[s.type]}
-        strokeLinecap="round" onMouseEnter={()=>setHover(i)} onMouseLeave={()=>setHover(null)} style={{cursor:"pointer",pointerEvents:"all"}}/>)}
-    </svg>
-    {hover!==null&&sg[hover]&&<div className="absolute top-2 right-2 px-3 py-2 rounded text-xs" style={{background:"#0f172aee",border:"1px solid #1e293b"}}>
-      <div className="font-bold" style={{color:LC[sg[hover].type]}}>{LL[sg[hover].type]}</div>
-      <div className="font-mono mt-1" style={{color:"#94a3b8"}}>({sg[hover].x1.toFixed(1)},{sg[hover].y1.toFixed(1)})→({sg[hover].x2.toFixed(1)},{sg[hover].y2.toFixed(1)})</div>
-      <div className="font-mono" style={{color:"#64748b"}}>Len: {Math.sqrt((sg[hover].x2-sg[hover].x1)**2+(sg[hover].y2-sg[hover].y1)**2).toFixed(2)}mm</div>
-    </div>}
-  </div>}
-
-const Dots=({v,mx=5,c="#f59e0b",bg="#1e293b"})=><div className="flex gap-0.5">{Array.from({length:mx},(_,i)=><div key={i} className="w-1.5 h-1.5 rounded-full" style={{background:i<v?c:bg}}/>)}</div>;
-
-// ═══════════════════════════════════════════════════════════════
-// MAIN APP
-// ═══════════════════════════════════════════════════════════════
-function App(){
-  const[theme,setTheme]=useState("dark");
-  const[mode,setMode]=useState("engineer"); // engineer | customer
-  const[boxType,setBoxType]=useState("0201");
-  const[dims,setDims]=useState({L:300,W:200,H:150});
-  const[matId,setMatId]=useState("B");
-  const[selFins,setSelFins]=useState([]);
-  const[unit,setUnit]=useState("mm");
-  const[zoom,setZoom]=useState(1);
-  const[mTab,setMTab]=useState("dieline");
-  const[sTab,setSTab]=useState("box");
-  const[catF,setCatF]=useState(null);
-  const[finCatF,setFinCatF]=useState(null);
-  const[sq,setSq]=useState("");
-  const[bk,setBK]=useState(0.3);
-  const[ba,setBA]=useState(90);
-  const[bt2,setBT]=useState("rotary");
-  const[savedDesigns,setSaved]=useState([]);
-  const[showQuote,setShowQuote]=useState(false);
-  const[batchCSV,setBatchCSV]=useState("");
-  const[showBatch,setShowBatch]=useState(false);
-  const[batchErrors,setBatchErrors]=useState([]);
-  const[qty,setQty]=useState(1000);
-  const[compareId,setCompareId]=useState(null);
-  const[aiLoading,setAiLoading]=useState(false);
-  const[aiResult,setAiResult]=useState(null);
-  const[aiError,setAiError]=useState(null);
-  const fileRef=useRef(null);
-  const imgRef=useRef(null);
-
-  const T_=DARK,TL=LIGHT,TH=theme==="dark"?T_:TL;
-
-  // Keyboard shortcuts
-  useEffect(()=>{const h=e=>{if((e.ctrlKey||e.metaKey)&&e.key==="e"){e.preventDefault();if(r)exp("dxf")}
-    if((e.ctrlKey||e.metaKey)&&e.key==="s"){e.preventDefault();handleSave()}
-    if((e.ctrlKey||e.metaKey)&&e.key==="r"){e.preventDefault();resetDims()}};
-    window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h)});
-
-  // Load saved designs
-  useEffect(()=>{loadDesigns().then(d=>setSaved(d))},[]); 
-
-  const mat=MATS.find(m=>m.id===matId);const T=mat?.t||3;
-  const cv=unit==="in"?25.4:1;const L=dims.L*cv,W=dims.W*cv,H=dims.H*cv;
-  const blade={kerf:bk,angle:ba,type:bt2};
-  const v=useMemo(()=>validate(boxType,L,W,H,T,matId),[boxType,L,W,H,T,matId]);
-  const r=useMemo(()=>v.valid?generate(boxType,L,W,H,T,blade):null,[boxType,L,W,H,T,bk,ba,v.valid]);
-  const bt=BOXES.find(b=>b.id===boxType);
-  const sc=useMemo(()=>{if(!r)return{};const c={};r.segments.forEach(s=>{c[s.type]=(c[s.type]||0)+1});return c},[r]);
-  // Segment length totals (total mm of cut, fold, etc. — useful for machine time estimates)
-  const segLens=useMemo(()=>{if(!r)return{};const l={};r.segments.forEach(s=>{const len=Math.sqrt((s.x2-s.x1)**2+(s.y2-s.y1)**2);l[s.type]=(l[s.type]||0)+len});return l},[r]);
-  const totalCutLen=useMemo(()=>Object.values(segLens).reduce((s,v)=>s+v,0),[segLens]);
-  // Sheet utilization (box surface area vs sheet area)
-  const utilization=useMemo(()=>{if(!r)return null;const sheet=r.width*r.height;const box=2*(L*W+L*H+W*H);return Math.min(99,Math.round(box/sheet*100))},[r,L,W,H]);
-  const bctData=useMemo(()=>calcBCT(L,W,H,mat),[L,W,H,mat]);
-  const quote=useMemo(()=>calcQuote(r,mat,selFins,qty),[r,mat,selFins,qty]);
-  // Comparison mode
-  const compareBox=BOXES.find(b=>b.id===compareId);
-  const compareResult=useMemo(()=>{if(!compareId)return null;const cb=BOXES.find(b=>b.id===compareId);
-    if(!cb)return null;return generate(compareId,cb.dL,cb.dW,cb.dH,T,blade)},[compareId,T,bk,ba]);
-
-  // Reset dims when box type changes
-  const changeBox=useCallback(id=>{setBoxType(id);const b=BOXES.find(x=>x.id===id);
-    if(b)setDims({L:b.dL,W:b.dW,H:b.dH})},[]);
-
-  const fBoxes=useMemo(()=>{let l=BOXES;if(catF)l=l.filter(b=>b.cat===catF);
-    if(sq){const q=sq.toLowerCase();l=l.filter(b=>b.name.toLowerCase().includes(q)||b.sub.toLowerCase().includes(q)||b.desc.toLowerCase().includes(q))}return l},[catF,sq]);
-  const fFins=useMemo(()=>finCatF?FINS.filter(f=>f.cat===finCatF):FINS,[finCatF]);
-
-  const exp=useCallback(fmt=>{const n=`${bt?.id||"box"}_${Math.round(L)}x${Math.round(W)}x${Math.round(H)}`;
-    if(!r&&fmt!=="spec-pdf"&&fmt!=="struct-pdf")return;
-    if(fmt==="dxf")dl(makeDXF(r,blade),n+".dxf","application/dxf");
-    if(fmt==="svg")dl(makeSVG(r),n+".svg","image/svg+xml");
-    if(fmt==="cff2")dl(makeCFF2(r,blade,boxType,{L:Math.round(L),W:Math.round(W),H:Math.round(H)}),n+".cf2","application/octet-stream");
-    if(fmt==="pdf")dl(makePrintSVG(r),n+"_print.svg","image/svg+xml");
-    if(fmt==="spec-pdf")dl(makeSpecPDF(bt,L,W,H,T,mat,r,quote,bctData,sc,segLens,selFins,FINS,blade),n+"_spec.svg","image/svg+xml");
-    if(fmt==="struct-pdf")dl(makeStructPDF(bt,L,W,H,T,mat,bctData),n+"_structural.svg","image/svg+xml");
-  },[r,bt,L,W,H,T,blade,boxType,mat,quote,bctData,sc,segLens,selFins]);
-
-  const handleSave=useCallback(async()=>{
-    const name=`${bt?.name} ${Math.round(L)}×${Math.round(W)}×${Math.round(H)}`;
-    await saveDesign(name,{boxType,dims,matId,selFins,bk,ba,bt2});
-    setSaved(await loadDesigns())},[bt,L,W,H,boxType,dims,matId,selFins,bk,ba,bt2]);
-
-  const handleLoadDesign=useCallback(d=>{
-    setBoxType(d.boxType||"0201");setDims(d.dims||{L:300,W:200,H:150});
-    setMatId(d.matId||"B");setSelFins(d.selFins||[]);setBK(d.bk||.3);setBA(d.ba||90);setBT(d.bt2||"rotary")},[]);
-
-  // Batch CSV processing with validation
-  const processBatch=useCallback(()=>{if(!batchCSV.trim())return;
-    const lines=batchCSV.trim().split("\n").filter(l=>l.trim()&&!l.startsWith("#"));
-    const errors=[];let allDxf="";let ok=0;
-    lines.forEach((line,i)=>{
-      const parts=line.split(",").map(s=>s.trim());
-      if(parts.length<4){errors.push(`Line ${i+1}: Need 4 values (BoxType,L,W,H), got ${parts.length}`);return}
-      const[id,l,w,h]=parts;const bL=parseFloat(l),bW=parseFloat(w),bH=parseFloat(h);
-      if(isNaN(bL)||isNaN(bW)||isNaN(bH)){errors.push(`Line ${i+1}: Invalid numbers "${l},${w},${h}"`);return}
-      if(bL<=0||bW<=0||bH<=0){errors.push(`Line ${i+1}: Dimensions must be > 0`);return}
-      const boxDef=BOXES.find(b=>b.id===id);
-      if(!boxDef){errors.push(`Line ${i+1}: Unknown box type "${id}" — using 0201`)}
-      try{const br=generate(id||"0201",bL,bW,bH,T,blade);
-        allDxf+=`\n999\n--- SKU ${i+1}: ${id||"0201"} ${bL}x${bW}x${bH} ---\n`;
-        allDxf+=makeDXF(br,blade);ok++}
-      catch(e){errors.push(`Line ${i+1}: Generation failed — ${e.message}`)}});
-    setBatchErrors(errors);
-    if(allDxf)dl(allDxf,`batch_${ok}_boxes.dxf`,"application/dxf")},[batchCSV,T,blade]);
-
-  // Reset dimensions to box type defaults
-  const resetDims=useCallback(()=>{const b=BOXES.find(x=>x.id===boxType);
-    if(b)setDims({L:b.dL,W:b.dW,H:b.dH})},[boxType]);
-
-  // AI: Parse PDF spec sheet for dimensions
-  const handlePDFUpload=useCallback(async(e)=>{
-    const file=e.target.files?.[0];if(!file)return;
-    setAiLoading(true);setAiError(null);setAiResult(null);
-    try{
-      const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=()=>rej(new Error("Read failed"));r.readAsDataURL(file)});
-      const isPDF=file.type==="application/pdf";
-      const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,
-          messages:[{role:"user",content:[
-            {type:isPDF?"document":"image",source:{type:"base64",media_type:file.type,data:b64}},
-            {type:"text",text:`Analyze this ${isPDF?"PDF specification sheet":"technical drawing"} for a shipping/packaging box. Extract the following and respond ONLY with JSON, no markdown backticks or other text:
-{"length_mm": number, "width_mm": number, "height_mm": number, "box_type": "FEFCO code or type name", "confidence": "high/medium/low", "notes": "any relevant observations about material, flute type, or special features"}
-If dimensions are in inches, convert to mm. If you can identify the FEFCO code, use the 4-digit code (e.g. "0201"). If not sure, use the closest match. If you cannot extract dimensions, set them to 0.`}]}]})});
-      const data=await resp.json();
-      const txt=data.content?.find(c=>c.type==="text")?.text||"";
-      const clean=txt.replace(/```json|```/g,"").trim();
-      const parsed=JSON.parse(clean);
-      setAiResult({...parsed,source:"pdf",fileName:file.name});
-      // Auto-apply if we got valid dimensions
-      if(parsed.length_mm>0&&parsed.width_mm>0&&parsed.height_mm>0){
-        setDims({L:Math.round(parsed.length_mm),W:Math.round(parsed.width_mm),H:Math.round(parsed.height_mm)});
-        // Try to match box type
-        const matchedBox=BOXES.find(b=>b.id===parsed.box_type||b.name.includes(parsed.box_type));
-        if(matchedBox)setBoxType(matchedBox.id);
-      }
-    }catch(err){setAiError(err.message||"Failed to parse")}finally{setAiLoading(false);if(e.target)e.target.value=""}
-  },[]);
-
-  // AI: Classify box from photo
-  const handleImageUpload=useCallback(async(e)=>{
-    const file=e.target.files?.[0];if(!file)return;
-    setAiLoading(true);setAiError(null);setAiResult(null);
-    try{
-      const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=()=>rej(new Error("Read failed"));r.readAsDataURL(file)});
-      const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,
-          messages:[{role:"user",content:[
-            {type:"image",source:{type:"base64",media_type:file.type,data:b64}},
-            {type:"text",text:`Analyze this photo of a physical box/package. Identify:
-1. The box type (match to FEFCO code if possible: 0201=RSC, 0202=Overlap, 0203=Full Overlap, 0204=Center Special, 0210=Half Slotted, 0215=Snap Lock, 0301=Telescope, 0401=Folder Tray, 0421=Four Corner, 0427=Hinged Lid, 0711=Crash Lock, 0713=Crash+Tuck, MAILER=Mailer, PIZZA=Pizza Box, etc.)
-2. Estimate dimensions in mm from visual cues (if a reference object is visible, use it for scale; otherwise estimate based on proportions and common box sizes)
-3. Estimate material type
-
-Respond ONLY with JSON, no markdown or other text:
-{"box_type": "FEFCO code", "box_name": "human readable name", "length_mm": number, "width_mm": number, "height_mm": number, "material_guess": "e.g. B-Flute corrugated", "confidence": "high/medium/low", "notes": "observations"}`}]}]})});
-      const data=await resp.json();
-      const txt=data.content?.find(c=>c.type==="text")?.text||"";
-      const clean=txt.replace(/```json|```/g,"").trim();
-      const parsed=JSON.parse(clean);
-      setAiResult({...parsed,source:"image",fileName:file.name});
-      if(parsed.length_mm>0&&parsed.width_mm>0&&parsed.height_mm>0){
-        setDims({L:Math.round(parsed.length_mm),W:Math.round(parsed.width_mm),H:Math.round(parsed.height_mm)});
-        const matchedBox=BOXES.find(b=>b.id===parsed.box_type||b.name.includes(parsed.box_type));
-        if(matchedBox)setBoxType(matchedBox.id);
-        // Try to match material
-        const matGuess=parsed.material_guess?.toLowerCase()||"";
-        const matchedMat=MATS.find(m=>matGuess.includes(m.name.toLowerCase().split(" ")[0]));
-        if(matchedMat)setMatId(matchedMat.id);
-      }
-    }catch(err){setAiError(err.message||"Failed to classify")}finally{setAiLoading(false);if(e.target)e.target.value=""}
-  },[]);
-
-  const di=(label,key)=>{
-    const step=unit==="in"?0.25:5;
-    return <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium tracking-wider" style={{color:TH.tm}}>{label}</label>
-      <div className="flex items-center gap-0.5 rounded-lg" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-        <button onClick={()=>setDims(d=>({...d,[key]:Math.max(0,d[key]-step)}))} className="px-2 py-2 text-sm font-bold rounded-l-lg"
-          style={{color:TH.ac,background:"transparent",border:"none",minWidth:28}}>−</button>
-        <div className="flex items-center gap-1 flex-1 px-1">
-          <span style={{color:TH.tf}} className="text-xs font-mono font-bold">{key}</span>
-          <input type="number" value={dims[key]} onChange={e=>setDims(d=>({...d,[key]:Math.max(0,parseFloat(e.target.value)||0)}))}
-            className="flex-1 bg-transparent text-right font-mono text-base outline-none" style={{color:TH.tx}} step={step}/>
-          <span className="text-xs font-mono" style={{color:TH.tm}}>{unit}</span>
-        </div>
-        <button onClick={()=>setDims(d=>({...d,[key]:d[key]+step}))} className="px-2 py-2 text-sm font-bold rounded-r-lg"
-          style={{color:TH.ac,background:"transparent",border:"none",minWidth:28}}>+</button>
-      </div></div>};
-
-  const isEng=mode==="engineer";
-
+  // ═══ RENDER ═══
   return(
-    <div className="h-screen flex flex-col overflow-hidden" style={{background:TH.bg0,color:TH.tx,fontFamily:"'DM Sans',system-ui,sans-serif"}}>
-      {/* HEADER */}
-      <header className="flex items-center justify-between px-4 py-2 flex-shrink-0" style={{background:TH.bg1,borderBottom:`1px solid ${TH.bd}`}}>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs" style={{background:`linear-gradient(135deg,${TH.ac},${TH.ac2})`,color:theme==="dark"?TH.bg0:"#fff"}}>BX</div>
-          <div><h1 className="text-sm font-bold tracking-wide" style={{color:TH.tx}}>TAG BOX CONVERTER <span style={{color:TH.ac}}>v7</span></h1>
-            <p className="text-xs" style={{color:TH.tf}}>{mode==="customer"?"Customer Portal":"Full Engineering Mode"}</p></div></div>
-        <div className="flex items-center gap-2">
-          {/* Mode toggle */}
-          <button onClick={()=>setMode(m=>m==="engineer"?"customer":"engineer")} className="px-2 py-1 rounded text-xs font-bold"
-            style={{background:TH.bg3,color:TH.td}}>{mode==="customer"?"⚙ Engineer":"👤 Customer"}</button>
-          {/* Theme toggle */}
-          <button onClick={()=>setTheme(t=>t==="dark"?"light":"dark")} className="px-2 py-1 rounded text-xs"
-            style={{background:TH.bg3,color:TH.td}}>{theme==="dark"?"☀":"🌙"}</button>
-          {/* Units */}
-          <div className="flex rounded overflow-hidden text-xs" style={{border:`1px solid ${TH.bd}`}}>
-            {["mm","in"].map(u=><button key={u} onClick={()=>setUnit(u)} className="px-2 py-1 font-mono font-bold"
-              style={{background:unit===u?TH.bg3:"transparent",color:unit===u?TH.ac:TH.tm}}>{u}</button>)}</div>
-          {/* Exports */}
-          {v.valid&&<div className="flex gap-1">
-            <button onClick={()=>exp("dxf")} className="px-2 py-1 rounded text-xs font-bold" style={{background:`linear-gradient(135deg,${TH.ac},${TH.ac2})`,color:"#000"}}>DXF</button>
-            {isEng&&<button onClick={()=>exp("cff2")} className="px-2 py-1 rounded text-xs font-bold" style={{background:TH.bl,color:"#fff"}}>CFF2</button>}
-            <button onClick={()=>exp("svg")} className="px-2 py-1 rounded text-xs font-bold" style={{background:TH.bg3,color:TH.tx}}>SVG</button>
-            {isEng&&<button onClick={()=>exp("pdf")} className="px-2 py-1 rounded text-xs font-bold" style={{background:TH.bg3,color:TH.tx}}>PDF+Marks</button>}
-          </div>}
-          {/* Save */}
-          <button onClick={handleSave} className="px-2 py-1 rounded text-xs" style={{background:TH.gn+"22",color:TH.gn,border:`1px solid ${TH.gn}33`}}>💾 Save</button>
-          {/* Batch */}
-          {isEng&&<button onClick={()=>setShowBatch(!showBatch)} className="px-2 py-1 rounded text-xs" style={{background:TH.pu+"22",color:TH.pu}}>📊 Batch</button>}
-          {/* Quote */}
-          <button onClick={()=>setShowQuote(!showQuote)} className="px-2 py-1 rounded text-xs" style={{background:TH.or+"22",color:TH.or}}>💰 Quote</button>
-        </div></header>
+    <div style={{height:"100%",display:"flex",flexDirection:"column",background:S.bg0||S.bg,overflow:"hidden"}}>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px 6px",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:34,height:34,borderRadius:10,background:"linear-gradient(135deg,"+S.ac+","+S.ac2+")",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:13,color:"#000"}}>BX</div>
+          <div><div style={{fontWeight:800,fontSize:16,color:S.tx}}>{bt?.name||"TAG Box"}</div>
+            <div style={{fontSize:11,color:S.tm||S.t3}}>{mat?.name} · {L}×{W}×{H}mm</div></div></div>
+        <div style={{display:"flex",gap:6}}>
+          <button onClick={()=>setDk(!dk)} style={{width:36,height:36,borderRadius:18,background:S.bg3||S.c2,border:"none",fontSize:17}}>{dk?"☀️":"🌙"}</button>
+          <button onClick={()=>setSheet("export")} style={{height:36,padding:"0 16px",borderRadius:18,background:"linear-gradient(135deg,"+S.ac+","+S.ac2+")",border:"none",fontWeight:800,fontSize:13,color:"#000"}}>Export</button>
+        </div></div>
 
-      {/* Batch CSV Modal */}
-      {showBatch&&<div className="px-4 py-3 flex-shrink-0" style={{background:TH.bg2,borderBottom:`1px solid ${TH.bd}`}}>
-        <div className="flex items-start gap-3">
-          <div className="flex-1"><label className="text-xs font-bold" style={{color:TH.pu}}>BATCH CSV — Format: BoxType,L,W,H (one per line)</label>
-            <textarea value={batchCSV} onChange={e=>{setBatchCSV(e.target.value);setBatchErrors([])}} rows={3} placeholder="0201,300,200,150&#10;MAILER,250,180,80&#10;0203,400,300,250"
-              className="w-full mt-1 rounded px-3 py-2 text-xs font-mono outline-none" style={{background:TH.bg1,border:`1px solid ${TH.bd}`,color:TH.tx,resize:"vertical"}}/>
-            {batchCSV.trim()&&<div className="text-xs mt-1" style={{color:TH.tm}}>{batchCSV.trim().split("\n").filter(l=>l.trim()&&!l.startsWith("#")).length} lines detected</div>}
-            {batchErrors.length>0&&<div className="mt-2 rounded p-2" style={{background:TH.rd+"11",border:`1px solid ${TH.rd}33`}}>
-              {batchErrors.map((e,i)=><div key={i} className="text-xs" style={{color:TH.rd}}>⚠ {e}</div>)}</div>}
+      {/* Quick stats */}
+      {unitCost&&<div style={{display:"flex",gap:12,padding:"4px 16px 6px"}}>
+        <span style={{fontSize:11,color:S.tm||S.t3}}>$<b style={{color:S.gn}}>{unitCost}</b>/unit</span>
+        {bctData&&<span style={{fontSize:11,color:S.tm||S.t3}}>BCT: <b style={{color:S.gn}}>{bctData.safeLoad}N</b></span>}
+        <button onClick={()=>setSheet("quote")} style={{fontSize:11,color:S.ac,background:"none",border:"none",fontWeight:700,marginLeft:"auto"}}>Quote →</button>
+      </div>}
+
+      {/* Content */}
+      <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+
+        {tab==="design"&&<div style={{flex:1,overflow:"auto",padding:"0 16px 16px",WebkitOverflowScrolling:"touch"}}>
+          <Dim label="LENGTH" k="L"/><Dim label="WIDTH" k="W"/><Dim label="HEIGHT" k="H"/>
+          <button onClick={resetDims} style={{width:"100%",padding:12,borderRadius:12,background:S.bg3||S.c2,border:"1px solid "+S.bd,color:S.td||S.t2,fontSize:13,fontWeight:600,marginBottom:16}}>↺ Reset Dimensions</button>
+          {!v.valid&&<div style={{padding:14,borderRadius:14,background:(S.rd||"#ef4444")+"15",border:"1px solid "+(S.rd||"#ef4444")+"33",marginBottom:12}}>
+            {v.errors.map((e,i)=><div key={i} style={{color:S.rd,fontSize:13,fontWeight:600}}>✗ {e}</div>)}</div>}
+          {v.warnings.length>0&&<div style={{padding:10,borderRadius:12,background:S.ac+"15",marginBottom:12}}>
+            {v.warnings.map((w,i)=><div key={i} style={{color:S.ac,fontSize:12}}>⚠ {w}</div>)}</div>}
+          <div style={{fontWeight:800,fontSize:13,color:S.tm,marginBottom:6,letterSpacing:1}}>MATERIAL</div>
+          <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,marginBottom:12,WebkitOverflowScrolling:"touch"}}>
+            {MATS.map(m=><button key={m.id} onClick={()=>setMatId(m.id)} style={{flexShrink:0,padding:"10px 16px",borderRadius:12,background:matId===m.id?S.ac+"20":(S.bg2||S.c1),border:"2px solid "+(matId===m.id?S.ac:S.bd),minWidth:90}}>
+              <div style={{fontWeight:700,fontSize:13,color:matId===m.id?S.ac:S.tx}}>{m.name}</div>
+              <div style={{fontSize:11,color:S.tm,marginTop:2}}>{m.t}mm</div></button>)}</div>
+          <div style={{fontWeight:800,fontSize:13,color:S.tm,marginBottom:6,letterSpacing:1}}>BOX TYPE</div>
+          <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,marginBottom:8,WebkitOverflowScrolling:"touch"}}>
+            <button onClick={()=>setCatF(null)} style={{flexShrink:0,padding:"7px 14px",borderRadius:20,background:!catF?S.ac:"transparent",border:"1px solid "+(!catF?S.ac:S.bd),color:!catF?"#000":(S.td||S.t2),fontSize:12,fontWeight:700}}>All</button>
+            {CATS.map(c=><button key={c.id} onClick={()=>setCatF(catF===c.id?null:c.id)} style={{flexShrink:0,padding:"7px 14px",borderRadius:20,background:catF===c.id?S.ac:"transparent",border:"1px solid "+(catF===c.id?S.ac:S.bd),color:catF===c.id?"#000":(S.td||S.t2),fontSize:12,fontWeight:600}}>{c.icon} {c.name}</button>)}</div>
+          {fBoxes.map(b=>{const sel=boxId===b.id;return <button key={b.id} onClick={()=>changeBox(b.id)}
+            style={{display:"flex",alignItems:"center",gap:14,padding:16,borderRadius:16,background:sel?S.ac+"12":(S.bg2||S.c1),border:"2px solid "+(sel?S.ac:S.bd),width:"100%",marginBottom:8,textAlign:"left"}}>
+            <div style={{width:40,height:40,borderRadius:12,background:sel?S.ac+"22":(S.bg3||S.c2),display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{CATS.find(x=>x.id===b.cat)?.icon}</div>
+            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:15,color:sel?S.ac:S.tx}}>{b.name}</div>
+              <div style={{fontSize:12,color:S.tm}}>{b.sub} — {b.desc}</div></div>
+            {sel&&<div style={{width:28,height:28,borderRadius:14,background:S.ac,display:"flex",alignItems:"center",justifyContent:"center",color:"#000",fontWeight:900,fontSize:14}}>✓</div>}
+          </button>})}
+        </div>}
+
+        {tab==="preview"&&<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div style={{display:"flex",gap:6,padding:"6px 16px",flexShrink:0}}>
+            {[["2d","2D Dieline"],["3d","3D Interactive"]].map(([k,l])=><button key={k} onClick={()=>setPm(k)}
+              style={{flex:1,padding:12,borderRadius:12,background:pm===k?S.ac:(S.bg3||S.c2),border:"none",color:pm===k?"#000":(S.td||S.t2),fontSize:15,fontWeight:700}}>{l}</button>)}</div>
+          <div ref={canvasRef} style={{flex:1,overflow:"hidden",margin:"6px 12px 8px",borderRadius:16,border:"1px solid "+S.bd,touchAction:"none"}}>
+            {!r?<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",color:S.tm}}>Fix dimensions to preview</div>
+            :pm==="2d"?(()=>{const{segments:ss,width:ww,height:hh}=r;const p=10;
+              const dm={cut:"none",fold:"6,3",crease:"8,3,2,3",glue:"3,3",perf:"2,4",tongue:"4,2",groove:"2,2,6,2"};
+              const sw2={cut:1.2,fold:.7,crease:.5,glue:.5,perf:.6,tongue:1,groove:.8};
+              return <svg viewBox={-p+" "+(-p)+" "+(ww+p*2)+" "+(hh+p*2)} style={{width:"100%",height:"100%",background:S.canvas||"#0d1117"}}>
+                <defs><pattern id="gr" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke={S.bd} strokeWidth=".15"/></pattern></defs>
+                <rect x={-p*4} y={-p*4} width={(ww+p*2)*4} height={(hh+p*2)*4} fill="url(#gr)"/>
+                {ss.map((s,i)=><line key={i} x1={s.x1} y1={hh-s.y1} x2={s.x2} y2={hh-s.y2} stroke={LC[s.type]} strokeWidth={sw2[s.type]||.6} strokeDasharray={dm[s.type]} strokeLinecap="round"/>)}
+                <text x={ww/2} y={hh+p-1} textAnchor="middle" fill={S.ac} fontSize="5" fontFamily="monospace">{ww.toFixed(0)}×{hh.toFixed(0)}mm</text></svg>})()
+            :render3D()}
           </div>
-          <div className="flex flex-col gap-2 mt-4">
-            <button onClick={processBatch} className="px-4 py-2 rounded text-xs font-bold" style={{background:TH.pu,color:"#fff"}}>Generate All DXF</button>
-            <button onClick={()=>{setShowBatch(false);setBatchErrors([])}} className="text-xs px-2 py-1 text-center" style={{color:TH.tm}}>Close</button>
-          </div>
-        </div></div>}
+          {r&&<div style={{display:"flex",gap:8,padding:"0 16px 6px",overflowX:"auto",flexShrink:0}}>
+            {Object.entries(LC).filter(([t])=>segC[t]).map(([t,c])=><div key={t} style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+              <div style={{width:14,height:3,borderRadius:2,background:c}}/><span style={{fontSize:11,color:S.tm}}>{LL[t]} {segC[t]}</span></div>)}</div>}
+        </div>}
 
-      {/* Quote Panel with Qty Slider */}
-      {showQuote&&quote&&<div className="px-4 py-3 flex-shrink-0" style={{background:TH.bg2,borderBottom:`1px solid ${TH.bd}`}}>
-        <div className="flex items-center gap-3 mb-2">
-          <span className="text-xs font-bold" style={{color:TH.or}}>INSTANT QUOTE</span>
-          <div className="flex items-center gap-2 flex-1">
-            <span className="text-xs" style={{color:TH.tm}}>Qty:</span>
-            <input type="range" min="100" max="100000" step="100" value={qty} onChange={e=>setQty(parseInt(e.target.value))} className="flex-1" style={{accentColor:TH.ac}}/>
-            <input type="number" value={qty} onChange={e=>setQty(Math.max(1,parseInt(e.target.value)||1000))}
-              className="w-20 rounded px-2 py-1 text-xs font-mono text-right outline-none" style={{background:TH.bg1,border:`1px solid ${TH.bd}`,color:TH.tx}}/>
-          </div>
-          <button onClick={()=>setShowQuote(false)} className="text-xs px-2 py-1" style={{color:TH.tm}}>✕</button>
-        </div>
-        <div className="flex items-center gap-4">
-          {[["Unit Cost",`$${quote.unitCost}`],["Per "+qty.toLocaleString(),`$${quote.per1k}`],["Material",`$${quote.matCost}`],
-            ["Finish/unit",`$${quote.finCost}`],["Weight",`${quote.weight}g`],["Die Saved",`$${(0.75*qty/1000).toFixed(0)}/batch`]
-          ].map(([l,v])=><div key={l} className="text-center"><div className="text-xs" style={{color:TH.tm}}>{l}</div>
-            <div className="text-sm font-mono font-bold" style={{color:TH.gn}}>{v}</div></div>)}
-        </div></div>}
+        {tab==="specs"&&<div style={{flex:1,overflow:"auto",padding:"0 16px 16px",WebkitOverflowScrolling:"touch"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <div><div style={{fontWeight:800,fontSize:20,color:S.ac}}>{bt?.name}</div>
+              <div style={{fontSize:13,color:S.td||S.t2}}>{bt?.sub} — {bt?.desc}</div></div>
+            <button onClick={()=>doExport("spec-pdf")} style={{padding:"8px 12px",borderRadius:10,background:(S.rd||"#ef4444")+"22",color:S.rd,border:"none",fontSize:12,fontWeight:700,flexShrink:0}}>📄 PDF</button></div>
+          {[["L",L+"mm"],["W",W+"mm"],["H",H+"mm"],["Vol",((L*W*H)/1e6).toFixed(2)+"L"],["Mat",mat?.name],["T",mT+"mm"]].map(([l,v])=>
+            <div key={l} style={{display:"inline-block",width:"32%",padding:10,borderRadius:10,background:S.bg2||S.c1,border:"1px solid "+S.bd,marginBottom:4,marginRight:"1%",verticalAlign:"top"}}>
+              <div style={{fontSize:10,color:S.tm}}>{l}</div><div style={{fontSize:16,fontWeight:800,fontFamily:"monospace"}}>{v}</div></div>)}
+          {quote&&<div style={{marginTop:8}}>{[["Weight",quote.weight+"g"],["Sheet",quote.sheetArea+"cm²"],["Cost","$"+unitCost],["Segs",r?.segments.length]].map(([l,v])=>
+            <div key={l} style={{display:"inline-block",width:"24%",padding:8,borderRadius:10,background:S.bg2||S.c1,border:"1px solid "+S.bd,marginBottom:4,marginRight:"1%",textAlign:"center"}}>
+              <div style={{fontSize:10,color:S.tm}}>{l}</div><div style={{fontSize:14,fontWeight:800,fontFamily:"monospace",color:S.gn}}>{v}</div></div>)}</div>}
+          {r&&<div style={{marginTop:12,borderRadius:12,overflow:"hidden",border:"1px solid "+S.bd}}>
+            {Object.entries(segC).map(([t,cnt],i)=><div key={t} style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:i%2?(S.bg2||S.c1):(S.bg1||S.c2),borderBottom:"1px solid "+S.bd}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:14,height:4,borderRadius:2,background:LC[t]}}/><span style={{fontSize:13,color:S.td||S.t2}}>{LL[t]}</span></div>
+              <div style={{display:"flex",gap:12}}><span style={{fontSize:12,fontFamily:"monospace",color:S.tm}}>{segLens[t]?(segLens[t]/10).toFixed(0)+"cm":""}</span><span style={{fontSize:13,fontWeight:700,fontFamily:"monospace"}}>{cnt}</span></div></div>)}</div>}
+        </div>}
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* SIDEBAR */}
-        <aside className="w-72 flex-shrink-0 flex flex-col overflow-hidden" style={{background:TH.bg1,borderRight:`1px solid ${TH.bd}`}}>
-          <div className="flex border-b" style={{borderColor:TH.bd}}>
-            {[{id:"box",l:"Box"},{id:"mat",l:"Material"},{id:"fin",l:"Finish"},
-              ...(isEng?[{id:"blade",l:"Blade"}]:[]),{id:"ai",l:"🤖 AI"},{id:"saved",l:"Saved"}].map(t=>
-              <button key={t.id} onClick={()=>setSTab(t.id)} className="flex-1 py-2 text-xs font-bold text-center"
-                style={{color:sTab===t.id?TH.ac:TH.tm,borderBottom:sTab===t.id?`2px solid ${TH.ac}`:"2px solid transparent",background:sTab===t.id?TH.bg2:"transparent"}}>{t.l}</button>)}</div>
+        {tab==="more"&&<div style={{flex:1,overflow:"auto",padding:"0 16px 16px",WebkitOverflowScrolling:"touch"}}>
+          {/* AI */}
+          <div style={{fontWeight:800,fontSize:13,color:S.pu||"#a855f7",marginBottom:8,letterSpacing:1}}>🤖 AI TOOLS</div>
+          <input ref={aiFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={e=>handleAI(e,"pdf")} style={{display:"none"}}/>
+          <input ref={aiImgRef} type="file" accept="image/*" capture="environment" onChange={e=>handleAI(e,"img")} style={{display:"none"}}/>
+          <button onClick={()=>aiFileRef.current?.click()} disabled={aiLoading} style={{width:"100%",padding:16,borderRadius:14,background:(S.pu||"#a855f7")+"15",border:"2px solid "+(S.pu||"#a855f7")+"44",marginBottom:8,textAlign:"left"}}>
+            <div style={{fontWeight:700,fontSize:15,color:S.pu||"#a855f7"}}>{aiLoading?"⏳ Analyzing...":"📄 Upload Spec Sheet"}</div>
+            <div style={{fontSize:12,color:S.tm,marginTop:2}}>PDF/image → AI extracts dimensions</div></button>
+          <button onClick={()=>aiImgRef.current?.click()} disabled={aiLoading} style={{width:"100%",padding:16,borderRadius:14,background:(S.pk||"#ec4899")+"15",border:"2px solid "+(S.pk||"#ec4899")+"44",marginBottom:8,textAlign:"left"}}>
+            <div style={{fontWeight:700,fontSize:15,color:S.pk||"#ec4899"}}>{aiLoading?"⏳ Classifying...":"📷 Photo a Box"}</div>
+            <div style={{fontSize:12,color:S.tm,marginTop:2}}>Camera → FEFCO type + dimensions</div></button>
+          {aiResult&&!aiResult.error&&<div style={{padding:14,borderRadius:14,background:S.gn+"15",border:"2px solid "+S.gn+"33",marginBottom:12}}>
+            <div style={{fontWeight:700,color:S.gn,marginBottom:6}}>✓ AI Result</div>
+            {aiResult.box_type&&<div style={{fontSize:13,color:S.td||S.t2}}>Type: <b style={{color:S.ac}}>{aiResult.box_type}</b></div>}
+            <div style={{fontSize:13,color:S.td||S.t2}}>Size: <b>{aiResult.length_mm}×{aiResult.width_mm}×{aiResult.height_mm}mm</b></div>
+            <button onClick={()=>{if(aiResult.length_mm>0)setDims({L:Math.round(aiResult.length_mm),W:Math.round(aiResult.width_mm),H:Math.round(aiResult.height_mm)});setTab("design")}}
+              style={{width:"100%",marginTop:8,padding:10,borderRadius:10,background:S.gn,border:"none",color:"#fff",fontWeight:700,fontSize:13}}>Apply & Design</button></div>}
+          {aiResult?.error&&<div style={{padding:12,borderRadius:12,background:S.rd+"15",marginBottom:12,color:S.rd,fontSize:13}}>Error: {aiResult.error}</div>}
 
-          <div className="flex-1 overflow-y-auto p-2.5">
-            {sTab==="box"&&<>
-              <input value={sq} onChange={e=>setSq(e.target.value)} placeholder="Search..." className="w-full rounded px-3 py-1.5 text-xs outline-none mb-2" style={{background:TH.bg2,border:`1px solid ${TH.bd}`,color:TH.tx}}/>
-              <div className="flex flex-wrap gap-1 mb-2">
-                <button onClick={()=>setCatF(null)} className="px-1.5 py-0.5 rounded text-xs font-bold" style={{background:!catF?TH.ac+"22":"transparent",color:!catF?TH.ac:TH.tm}}>All</button>
-                {CATS.map(c=><button key={c.id} onClick={()=>setCatF(catF===c.id?null:c.id)} className="px-1.5 py-0.5 rounded text-xs"
-                  style={{background:catF===c.id?TH.ac+"22":"transparent",color:catF===c.id?TH.ac:TH.tm}}>{c.icon}</button>)}</div>
-              <div className="flex flex-col gap-1">{fBoxes.map(b=><button key={b.id} onClick={()=>changeBox(b.id)} className="w-full text-left rounded-lg p-2"
-                style={{background:boxType===b.id?TH.bg3:TH.bg2,border:`1px solid ${boxType===b.id?TH.ac+"55":TH.bd}`}}>
-                <div className="flex items-center justify-between"><span className="text-xs font-bold" style={{color:boxType===b.id?TH.ac:TH.td}}>{b.name}</span>
-                  <span className="text-xs">{CATS.find(x=>x.id===b.cat)?.icon}</span></div>
-                <div className="text-xs" style={{color:TH.tm}}>{b.sub}</div>
-                {boxType===b.id&&<div className="text-xs mt-1" style={{color:TH.tf}}>{b.desc}</div>}
-              </button>)}</div></>}
-
-            {sTab==="mat"&&<>{MAT_CATS.map(c=><div key={c.id} className="mb-3">
-              <h3 className="text-xs font-bold tracking-widest mb-1 px-1" style={{color:TH.tm}}>{c.name.toUpperCase()}</h3>
-              {MATS.filter(m=>m.cat===c.id).map(m=><button key={m.id} onClick={()=>setMatId(m.id)} className="w-full text-left rounded p-2 mb-1"
-                style={{background:matId===m.id?TH.bg3:TH.bg2,border:`1px solid ${matId===m.id?TH.ac+"55":TH.bd}`}}>
-                <div className="flex justify-between"><span className="text-xs font-bold" style={{color:matId===m.id?TH.ac:TH.td}}>{m.name}</span>
-                  <span className="text-xs font-mono" style={{color:TH.tf}}>{m.t}mm</span></div>
-                <div className="text-xs" style={{color:TH.tm}}>{m.desc}</div>
-                {matId===m.id&&<div className="flex gap-3 mt-1"><div className="text-xs"><span style={{color:TH.tf}}>Str </span><Dots v={m.str}/></div>
-                  <div className="text-xs"><span style={{color:TH.tf}}>Prt </span><Dots v={m.prt} c={TH.bl}/></div></div>}
-              </button>)}</div>)}</>}
-
-            {sTab==="fin"&&<>
-              <div className="flex flex-wrap gap-1 mb-2">{[{id:null,l:"All"},...FIN_CATS.map(c=>({id:c.id,l:c.icon}))].map(c=>
-                <button key={c.id||"all"} onClick={()=>setFinCatF(c.id)} className="px-1.5 py-0.5 rounded text-xs"
-                  style={{background:finCatF===c.id?TH.ac+"22":"transparent",color:finCatF===c.id?TH.ac:TH.tm}}>{c.l}</button>)}</div>
-              {selFins.length>0&&<div className="mb-2 px-2 py-1 rounded text-xs font-bold" style={{background:TH.ac+"15",color:TH.ac}}>{selFins.length} selected</div>}
-              {fFins.map(f=>{const sel=selFins.includes(f.id);return <button key={f.id} onClick={()=>setSelFins(p=>sel?p.filter(x=>x!==f.id):[...p,f.id])}
-                className="w-full text-left rounded p-2 mb-1" style={{background:sel?TH.ac+"11":TH.bg2,border:`1px solid ${sel?TH.ac+"55":TH.bd}`}}>
-                <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 rounded flex items-center justify-center"
-                  style={{background:sel?TH.ac:TH.bg3,color:sel?"#000":TH.tf,fontSize:10}}>{sel?"✓":""}</div>
-                  <span className="text-xs font-bold" style={{color:sel?TH.ac:TH.td}}>{f.name}</span>
-                  {f.pr&&<span className="text-xs px-1 rounded" style={{background:TH.ac+"22",color:TH.ac,fontSize:8}}>PRO</span>}</div>
-              </button>})}</>}
-
-            {sTab==="blade"&&isEng&&<div className="flex flex-col gap-3">
-              <div>{["rotary","flatbed","laser","digital"].map(t=>
-                <button key={t} onClick={()=>{setBT(t);if(t==="laser")setBK(0)}} className="w-full text-left rounded p-2 mb-1"
-                  style={{background:bt2===t?TH.bg3:TH.bg2,border:`1px solid ${bt2===t?TH.ac+"55":TH.bd}`}}>
-                  <span className="text-xs font-bold" style={{color:bt2===t?TH.ac:TH.td}}>{t.charAt(0).toUpperCase()+t.slice(1)}</span></button>)}</div>
-              <div><label className="text-xs font-bold" style={{color:TH.tm}}>KERF</label>
-                <input type="range" min="0" max="2" step=".05" value={bk} onChange={e=>setBK(parseFloat(e.target.value))} className="w-full" style={{accentColor:TH.ac}}/>
-                <div className="text-xs font-mono text-center" style={{color:TH.td}}>{bk}mm</div></div>
-              <div><label className="text-xs font-bold" style={{color:TH.tm}}>CUT ANGLE</label>
-                <input type="range" min="15" max="90" step="1" value={ba} onChange={e=>setBA(parseInt(e.target.value))} className="w-full" style={{accentColor:TH.ac}}/>
-                <div className="text-xs font-mono text-center" style={{color:TH.td}}>{ba}°</div>
-                <svg viewBox="0 0 100 40" className="w-20 mt-1"><line x1="10" y1="35" x2="90" y2="35" stroke={TH.bd} strokeWidth="2"/>
-                  <line x1="50" y1="35" x2={50+Math.cos((180-ba)*Math.PI/180)*25} y2={35+Math.sin((180-ba)*Math.PI/180)*25} stroke={TH.ac} strokeWidth="2.5" strokeLinecap="round"/></svg></div>
-              <div><label className="text-xs font-bold" style={{color:TH.tm}}>PRESETS</label>
-                {[{n:"Standard",k:.3,a:90,t:"rotary"},{n:"Precision",k:.5,a:90,t:"flatbed"},{n:"Laser",k:0,a:90,t:"laser"},
-                  {n:"V-Cut",k:.4,a:45,t:"flatbed"},{n:"Reset",k:.3,a:90,t:"rotary"}].map(p=>
-                  <button key={p.n} onClick={()=>{setBK(p.k);setBA(p.a);setBT(p.t)}} className="w-full text-left rounded px-2 py-1 mb-1 text-xs"
-                    style={{background:TH.bg2,border:`1px solid ${TH.bd}`,color:TH.td}}>{p.n} <span className="font-mono" style={{color:TH.tf}}>K:{p.k} A:{p.a}°</span></button>)}</div>
-            </div>}
-
-            {sTab==="ai"&&<div className="flex flex-col gap-4">
-              <div>
-                <h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.pu}}>📄 PDF SPEC SHEET PARSER</h3>
-                <p className="text-xs mb-2" style={{color:TH.tf}}>Upload a customer's technical drawing or spec sheet. AI extracts dimensions, box type, and material.</p>
-                <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={handlePDFUpload} className="hidden"/>
-                <button onClick={()=>fileRef.current?.click()} disabled={aiLoading}
-                  className="w-full rounded-lg py-3 text-xs font-bold transition-all"
-                  style={{background:TH.pu+"22",color:TH.pu,border:`1px solid ${TH.pu}44`}}>
-                  {aiLoading?"⏳ Analyzing...":"📄 Upload PDF / Drawing"}</button>
-              </div>
-
-              <div>
-                <h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.pk}}>📷 IMAGE BOX CLASSIFIER</h3>
-                <p className="text-xs mb-2" style={{color:TH.tf}}>Photo a physical box. AI identifies FEFCO type, estimates dimensions, and suggests material.</p>
-                <input ref={imgRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden"/>
-                <button onClick={()=>imgRef.current?.click()} disabled={aiLoading}
-                  className="w-full rounded-lg py-3 text-xs font-bold transition-all"
-                  style={{background:TH.pk+"22",color:TH.pk,border:`1px solid ${TH.pk}44`}}>
-                  {aiLoading?"⏳ Classifying...":"📷 Upload Box Photo"}</button>
-              </div>
-
-              {aiLoading&&<div className="rounded-lg p-4 text-center" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                <div className="text-2xl mb-2" style={{animation:"pulse 1.5s infinite"}}>🧠</div>
-                <div className="text-xs font-bold" style={{color:TH.ac}}>AI is analyzing your file...</div>
-                <div className="text-xs mt-1" style={{color:TH.tf}}>Extracting dimensions and identifying box type</div>
-              </div>}
-
-              {aiError&&<div className="rounded-lg p-3" style={{background:TH.rd+"11",border:`1px solid ${TH.rd}33`}}>
-                <div className="text-xs font-bold" style={{color:TH.rd}}>Error: {aiError}</div>
-                <div className="text-xs mt-1" style={{color:TH.tf}}>Check the file format and try again.</div>
-              </div>}
-
-              {aiResult&&<div className="rounded-lg p-3" style={{background:TH.gn+"11",border:`1px solid ${TH.gn}33`}}>
-                <div className="text-xs font-bold mb-2" style={{color:TH.gn}}>
-                  ✓ {aiResult.source==="pdf"?"PDF Parsed":"Box Classified"} — {aiResult.fileName}
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  {aiResult.box_type&&<div className="flex justify-between text-xs">
-                    <span style={{color:TH.tf}}>Box Type:</span>
-                    <span className="font-bold" style={{color:TH.ac}}>{aiResult.box_type} {aiResult.box_name||""}</span></div>}
-                  <div className="flex justify-between text-xs">
-                    <span style={{color:TH.tf}}>Dimensions:</span>
-                    <span className="font-mono font-bold" style={{color:TH.tx}}>
-                      {aiResult.length_mm}×{aiResult.width_mm}×{aiResult.height_mm}mm</span></div>
-                  {aiResult.material_guess&&<div className="flex justify-between text-xs">
-                    <span style={{color:TH.tf}}>Material:</span>
-                    <span style={{color:TH.bl}}>{aiResult.material_guess}</span></div>}
-                  <div className="flex justify-between text-xs">
-                    <span style={{color:TH.tf}}>Confidence:</span>
-                    <span className="font-bold" style={{color:aiResult.confidence==="high"?TH.gn:aiResult.confidence==="medium"?TH.ac:TH.rd}}>
-                      {aiResult.confidence?.toUpperCase()}</span></div>
-                  {aiResult.notes&&<div className="text-xs mt-1 p-2 rounded" style={{background:TH.bg3,color:TH.td}}>
-                    {aiResult.notes}</div>}
-                </div>
-                <div className="flex gap-2 mt-3">
-                  <button onClick={()=>{if(aiResult.length_mm>0)setDims({L:Math.round(aiResult.length_mm),W:Math.round(aiResult.width_mm),H:Math.round(aiResult.height_mm)})}}
-                    className="flex-1 rounded py-1.5 text-xs font-bold" style={{background:TH.gn+"22",color:TH.gn,border:`1px solid ${TH.gn}44`}}>
-                    ✓ Apply Dimensions</button>
-                  <button onClick={()=>setAiResult(null)} className="px-3 rounded py-1.5 text-xs"
-                    style={{background:TH.bg3,color:TH.tm}}>Clear</button>
-                </div>
-              </div>}
-
-              <div className="rounded-lg p-3" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                <h4 className="text-xs font-bold mb-1" style={{color:TH.tm}}>SUPPORTED INPUTS</h4>
-                <div className="text-xs" style={{color:TH.tf}}>
-                  <div>• PDF technical drawings with dimension annotations</div>
-                  <div>• PNG/JPG spec sheets or engineering drawings</div>
-                  <div>• Photos of physical boxes (any angle)</div>
-                  <div>• Include a ruler or known object for better size estimates</div>
-                </div>
-              </div>
-            </div>}
-
-            {sTab==="saved"&&<div className="flex flex-col gap-1">
-              {savedDesigns.length===0?<p className="text-xs" style={{color:TH.tf}}>No saved designs yet. Click 💾 to save current.</p>:
-                savedDesigns.map(d=><div key={d.key} className="rounded p-2 flex items-center justify-between" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                  <button onClick={()=>handleLoadDesign(d)} className="text-left flex-1">
-                    <div className="text-xs font-bold" style={{color:TH.ac}}>{d.name}</div>
-                    <div className="text-xs font-mono" style={{color:TH.tf}}>{new Date(d.ts).toLocaleDateString()}</div></button>
-                  <button onClick={async()=>{await deleteDesign(d.key);setSaved(await loadDesigns())}} className="text-xs px-1" style={{color:TH.rd}}>✕</button>
-                </div>)}</div>}
-          </div>
-        </aside>
-
-        {/* MAIN */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex items-end gap-2 px-4 py-2 flex-shrink-0" style={{background:TH.bg0,borderBottom:`1px solid ${TH.bd}`}}>
-            <div className="flex gap-2 flex-1">{di("LENGTH","L")}{di("WIDTH","W")}{di("HEIGHT","H")}
-              <div className="flex flex-col gap-1 justify-end">
-                <button onClick={resetDims} className="rounded px-2 py-2 text-xs font-bold whitespace-nowrap"
-                  style={{background:TH.bg3,color:TH.td,border:`1px solid ${TH.bd}`}} title="Reset to box type defaults">↺ Reset</button>
-              </div>
-            </div>
-            <div className="flex flex-col gap-1 min-w-36">
-              <div className="rounded px-2 py-1 text-xs" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}><span style={{color:TH.tf}}>Type: </span><span className="font-bold" style={{color:TH.ac}}>{bt?.name}</span></div>
-              <div className="rounded px-2 py-1 text-xs" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}><span style={{color:TH.tf}}>Mat: </span><span className="font-bold" style={{color:TH.bl}}>{mat?.name}</span></div>
-              {isEng&&<div className="rounded px-2 py-1 text-xs font-mono" style={{background:TH.bg2,border:`1px solid ${TH.bd}`,color:TH.or}}>K:{bk} A:{ba}°</div>}
-            </div>
-            <div className="rounded px-3 py-2" style={{background:v.valid?TH.gn+"11":TH.rd+"11",border:`1px solid ${v.valid?TH.gn+"33":TH.rd+"33"}`}}>
-              {v.valid?<span className="text-xs font-bold" style={{color:TH.gn}}>✓ Valid</span>
-                :<div>{v.errors.map((e,i)=><div key={i} className="text-xs" style={{color:TH.rd}}>✗ {e}</div>)}</div>}
-              {v.warnings.map((w,i)=><div key={i} className="text-xs" style={{color:TH.ac}}>⚠ {w}</div>)}</div>
-          </div>
-
-          <div className="flex items-center gap-1 px-4 pt-2" style={{background:TH.bg0}}>
-            {[{id:"dieline",l:"2D DIELINE"},{id:"3d",l:"3D INTERACTIVE"},{id:"specs",l:"SPECS"},
-              ...(isEng?[{id:"struct",l:"STRUCTURAL"},{id:"compare",l:"COMPARE"}]:[])].map(t=>
-              <button key={t.id} onClick={()=>setMTab(t.id)} className="px-3 py-2 rounded-t-lg text-xs font-bold tracking-wider"
-                style={{background:mTab===t.id?TH.canvas:"transparent",color:mTab===t.id?TH.ac:TH.tf,
-                  borderTop:mTab===t.id?`2px solid ${TH.ac}`:"2px solid transparent",
-                  borderLeft:mTab===t.id?`1px solid ${TH.bd}`:"none",borderRight:mTab===t.id?`1px solid ${TH.bd}`:"none"}}>{t.l}</button>)}
-            {mTab==="dieline"&&<div className="ml-auto flex items-center gap-1">
-              <button onClick={()=>setZoom(z=>Math.min(z*1.3,8))} className="w-6 h-6 rounded text-xs" style={{background:TH.bg3,color:TH.td}}>+</button>
-              <span className="text-xs font-mono px-1" style={{color:TH.tm}}>{Math.round(zoom*100)}%</span>
-              <button onClick={()=>setZoom(z=>Math.max(z/1.3,.1))} className="w-6 h-6 rounded text-xs" style={{background:TH.bg3,color:TH.td}}>−</button>
-              <button onClick={()=>setZoom(1)} className="px-2 h-6 rounded text-xs" style={{background:TH.bg3,color:TH.td}}>Fit</button></div>}</div>
-
-          <div className="flex-1 overflow-hidden relative" style={{background:TH.canvas,border:`1px solid ${TH.bd}`,borderTop:"none"}}>
-            {mTab==="dieline"&&(r?<Preview2D result={r} zoom={zoom} setZoom={setZoom} T={T}/>:<div className="flex items-center justify-center h-full"><p className="text-sm" style={{color:TH.tf}}>Fix errors</p></div>)}
-            {mTab==="3d"&&<Interactive3D L={L} W={W} H={H} T={T} boxId={boxType}/>}
-            {mTab==="specs"&&<div className="p-5 overflow-y-auto h-full"><div className="max-w-3xl mx-auto">
-              {/* Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div><h2 className="text-lg font-bold" style={{color:TH.ac}}>{bt?.name}</h2>
-                  <div className="text-sm" style={{color:TH.td}}>{bt?.sub} — {bt?.desc}</div></div>
-                <div className="text-right">
-                  <button onClick={()=>exp("spec-pdf")} className="px-3 py-1.5 rounded-lg text-xs font-bold mb-1"
-                    style={{background:TH.rd+"22",color:TH.rd,border:`1px solid ${TH.rd}33`}}>📄 Export Spec PDF</button>
-                  <div className="text-xs font-mono" style={{color:TH.tf}}>{new Date().toLocaleDateString()}</div></div>
-              </div>
-
-              {/* External Dimensions */}
-              <h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.tm}}>EXTERNAL DIMENSIONS</h3>
-              <div className="grid grid-cols-3 gap-2 mb-4">{[["Length (L)",`${L.toFixed(1)}mm`],["Width (W)",`${W.toFixed(1)}mm`],["Height (H)",`${H.toFixed(1)}mm`]].map(([l,vv])=>
-                <div key={l} className="rounded-lg p-3" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                  <div className="text-xs" style={{color:TH.tf}}>{l}</div><div className="font-mono font-bold mt-1 text-lg">{vv}</div></div>)}</div>
-
-              {/* Internal Dimensions */}
-              <h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.tm}}>INTERNAL DIMENSIONS (after material thickness)</h3>
-              <div className="grid grid-cols-4 gap-2 mb-4">{[
-                ["Int. Length",`${(L-T*2).toFixed(1)}mm`],["Int. Width",`${(W-T*2).toFixed(1)}mm`],["Int. Height",`${(H-T).toFixed(1)}mm`],
-                ["Int. Volume",`${(((L-T*2)*(W-T*2)*(H-T))/1e6).toFixed(3)}L`]].map(([l,vv])=>
-                <div key={l} className="rounded-lg p-2.5" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                  <div className="text-xs" style={{color:TH.tf}}>{l}</div><div className="font-mono font-bold mt-0.5 text-sm">{vv}</div></div>)}</div>
-
-              {/* Material & Construction */}
-              <h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.tm}}>MATERIAL & CONSTRUCTION</h3>
-              <div className="grid grid-cols-3 gap-2 mb-4">{[
-                ["Material",mat?.name||"—"],["Thickness",`${T}mm`],["GSM",`${mat?.gsm||0}`],
-                ["ECT",`${mat?.ect||0} kN/m`],["Strength",`${"★".repeat(mat?.str||0)}${"☆".repeat(5-(mat?.str||0))}`],["Printability",`${"★".repeat(mat?.prt||0)}${"☆".repeat(5-(mat?.prt||0))}`]].map(([l,vv])=>
-                <div key={l} className="rounded-lg p-2.5" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                  <div className="text-xs" style={{color:TH.tf}}>{l}</div><div className="font-mono font-bold mt-0.5 text-sm">{vv}</div></div>)}</div>
-
-              {/* Surface Area & Volume */}
-              <h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.tm}}>SURFACE AREA & VOLUME</h3>
-              {(()=>{const sa=2*(L*W+L*H+W*H);const vol=L*W*H;const isa=2*((L-T*2)*(W-T*2)+(L-T*2)*(H-T)+(W-T*2)*(H-T));
-                return <div className="grid grid-cols-4 gap-2 mb-4">{[
-                  ["Ext. Surface",`${(sa/100).toFixed(0)}cm²`],["Int. Surface",`${(isa/100).toFixed(0)}cm²`],
-                  ["Ext. Volume",`${(vol/1e6).toFixed(3)}L`],["Print Area",`${((sa*.85)/100).toFixed(0)}cm²`]].map(([l,vv])=>
-                  <div key={l} className="rounded-lg p-2.5" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                    <div className="text-xs" style={{color:TH.tf}}>{l}</div><div className="font-mono font-bold mt-0.5 text-sm">{vv}</div></div>)}</div>})()}
-
-              {/* Production Metrics */}
-              {quote&&<><h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.tm}}>PRODUCTION METRICS</h3>
-              <div className="grid grid-cols-4 gap-2 mb-4">{[
-                ["Sheet Size",r?`${r.width.toFixed(0)}×${r.height.toFixed(0)}mm`:"—"],
-                ["Sheet Area",`${quote.sheetArea}cm²`],
-                ["Weight",`${quote.weight}g`],
-                ["Utilization",utilization?`${utilization}%`:"—"],
-                ["Total Cut",totalCutLen?`${(totalCutLen/1000).toFixed(1)}m`:"—"],
-                ["Segments",r?`${r.segments.length}`:"—"],
-                ["Unit Cost",`$${quote.unitCost}`],
-                ["Per ${qty.toLocaleString()}",`$${quote.per1k}`]].map(([l,vv])=>
-                <div key={l} className="rounded-lg p-2.5" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                  <div className="text-xs" style={{color:TH.tf}}>{l}</div><div className="font-mono font-bold mt-0.5 text-sm" style={{color:TH.gn}}>{vv}</div></div>)}</div></>}
-
-              {/* Panel Analysis */}
-              {r&&<><h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.tm}}>PANEL ANALYSIS</h3>
-              <div className="rounded-lg overflow-hidden mb-4" style={{border:`1px solid ${TH.bd}`}}>
-                <div className="grid grid-cols-4 px-3 py-1.5" style={{background:TH.bg3}}>
-                  <span className="text-xs font-bold" style={{color:TH.tm}}>Panel</span>
-                  <span className="text-xs font-bold text-right" style={{color:TH.tm}}>Width</span>
-                  <span className="text-xs font-bold text-right" style={{color:TH.tm}}>Height</span>
-                  <span className="text-xs font-bold text-right" style={{color:TH.tm}}>Area</span></div>
-                {[["Front Panel",W,H],["Back Panel",W,H],["Left Panel",L,H],["Right Panel",L,H],
-                  ["Top Flap (major)",L,W/2],["Top Flap (minor)",W,W/2],
-                  ["Bottom Flap (major)",L,W/2],["Bottom Flap (minor)",W,W/2],
-                  ["Glue Tab",GW,H]].map(([n,pw,ph],i)=>
-                  <div key={n} className="grid grid-cols-4 px-3 py-1.5" style={{background:i%2?TH.bg2:TH.bg1,borderTop:`1px solid ${TH.bd}`}}>
-                    <span className="text-xs" style={{color:TH.td}}>{n}</span>
-                    <span className="text-xs font-mono text-right">{pw.toFixed(0)}mm</span>
-                    <span className="text-xs font-mono text-right">{ph.toFixed(0)}mm</span>
-                    <span className="text-xs font-mono text-right" style={{color:TH.gn}}>{(pw*ph/100).toFixed(0)}cm²</span></div>)}
-              </div></>}
-
-              {/* Segment Breakdown */}
-              {r&&<><h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.tm}}>SEGMENT BREAKDOWN</h3>
-              <div className="rounded-lg overflow-hidden mb-4" style={{border:`1px solid ${TH.bd}`}}>
-                <div className="grid grid-cols-4 px-3 py-1.5" style={{background:TH.bg3}}>
-                  <span className="text-xs font-bold" style={{color:TH.tm}}>Type</span>
-                  <span className="text-xs font-bold text-right" style={{color:TH.tm}}>Count</span>
-                  <span className="text-xs font-bold text-right" style={{color:TH.tm}}>Length</span>
-                  <span className="text-xs font-bold text-right" style={{color:TH.tm}}>% of Total</span></div>
-                {Object.entries(sc).map(([t,cnt],i)=>{const len=segLens[t]||0;
-                  return <div key={t} className="grid grid-cols-4 px-3 py-1.5 items-center" style={{background:i%2?TH.bg2:TH.bg1,borderTop:`1px solid ${TH.bd}`}}>
-                    <div className="flex items-center gap-2"><div className="w-3 h-1 rounded" style={{background:LC[t]}}/><span className="text-xs" style={{color:TH.td}}>{LL[t]}</span></div>
-                    <span className="text-xs font-mono text-right font-bold">{cnt}</span>
-                    <span className="text-xs font-mono text-right">{(len/10).toFixed(0)}cm</span>
-                    <span className="text-xs font-mono text-right" style={{color:TH.tf}}>{totalCutLen?(len/totalCutLen*100).toFixed(0):0}%</span></div>})}
-              </div></>}
-
-              {/* Shipping & Logistics */}
-              <h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.tm}}>SHIPPING & LOGISTICS</h3>
-              {(()=>{const palletL=1200,palletW=1000,palletH=1800;
-                const perLayer=Math.floor(palletL/L)*Math.floor(palletW/W);
-                const layers=Math.floor(palletH/H);const perPallet=perLayer*layers;
-                const flatPerLayer=r?Math.floor(palletL/r.width)*Math.floor(palletW/r.height):0;
-                return <div className="grid grid-cols-3 gap-2 mb-4">{[
-                  ["Assembled/Pallet",`~${perPallet}`],["Per Layer",`${perLayer}`],["Layers High",`${layers}`],
-                  ["Flat Sheets/Pallet",r?`~${flatPerLayer*500}`:"—"],["Flat Stack Height",r?`${T}mm each`:"—"],
-                  ["Pallet Base",`1200×1000mm`]].map(([l,vv])=>
-                  <div key={l} className="rounded-lg p-2.5" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                    <div className="text-xs" style={{color:TH.tf}}>{l}</div><div className="font-mono font-bold mt-0.5 text-sm">{vv}</div></div>)}</div>})()}
-
-              {/* Selected Finishes */}
-              {selFins.length>0&&<><h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.tm}}>APPLIED FINISHES ({selFins.length})</h3>
-                <div className="flex flex-wrap gap-1.5 mb-4">{selFins.map(fid=>{const f=FINS.find(x=>x.id===fid);
-                  return f?<span key={fid} className="text-xs px-2.5 py-1 rounded-lg" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>{f.name} {f.pr?"⭐":""}</span>:null})}</div></>}
-
-              {/* Blade Config */}
-              {isEng&&<><h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.tm}}>BLADE CONFIGURATION</h3>
-              <div className="grid grid-cols-3 gap-2 mb-4">{[["Blade Type",bt2],["Kerf",`${bk}mm`],["Cut Angle",`${ba}°`]].map(([l,vv])=>
-                <div key={l} className="rounded-lg p-2.5" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                  <div className="text-xs" style={{color:TH.tf}}>{l}</div><div className="font-mono font-bold mt-0.5 text-sm" style={{color:TH.or}}>{vv}</div></div>)}</div></>}
-
-              {/* DXF Layer Map */}
-              {isEng&&<><h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.tm}}>DXF/CFF2 LAYER MAP</h3>
-              <div className="rounded-lg p-3 mb-4 text-xs font-mono leading-relaxed" style={{background:TH.bg2,border:`1px solid ${TH.bd}`,color:TH.td}}>
-                {Object.entries(DXF_COL).map(([t,c])=><div key={t}><span style={{color:LC[t]}}>■ {t.toUpperCase()}</span> → DXF Color {c} · CFF2 Type {CFF2_LT[t]||1}</div>)}</div></>}
-            </div></div>}
-            {mTab==="struct"&&isEng&&<div className="p-5 overflow-y-auto h-full"><div className="max-w-2xl mx-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold" style={{color:TH.ac}}>Structural Analysis</h2>
-                {bctData&&<button onClick={()=>exp("struct-pdf")} className="px-3 py-1.5 rounded-lg text-xs font-bold"
-                  style={{background:TH.rd+"22",color:TH.rd,border:`1px solid ${TH.rd}33`}}>📄 Export Report PDF</button>}
-              </div>
-              {bctData?<>
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  {[["BCT (McKee)",`${bctData.bct} N`],["Safe Load (65%)",`${bctData.safeLoad} N`],
-                    ["ECT",`${bctData.ect} kN/m`],["Est. Stack Height",`${bctData.stackHeight} boxes`]].map(([l,vv])=>
-                    <div key={l} className="rounded-lg p-4" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                      <div className="text-xs" style={{color:TH.tf}}>{l}</div>
-                      <div className="text-2xl font-mono font-bold mt-1" style={{color:TH.gn}}>{vv}</div></div>)}
-                </div>
-                <div className="rounded-lg p-4 mb-4" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                  <h3 className="text-xs font-bold mb-2" style={{color:TH.tm}}>McKee Formula</h3>
-                  <div className="text-sm font-mono mb-2" style={{color:TH.ac}}>BCT = 5.87 × ECT × √(Z × P)</div>
-                  <div className="text-xs" style={{color:TH.tf}}>
-                    ECT = {bctData.ect} kN/m ({mat?.name})<br/>
-                    Z = {T}mm (combined board caliper)<br/>
-                    P = {(2*(L+W)).toFixed(0)}mm (perimeter = 2×{L.toFixed(0)} + 2×{W.toFixed(0)})</div>
-                </div>
-                {/* Additional Metrics */}
-                <h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.tm}}>ADDITIONAL METRICS</h3>
-                <div className="grid grid-cols-3 gap-2 mb-4">{[
-                  ["Burst Strength",`~${((mat?.ect||0)*1.6*T).toFixed(0)} kPa`],
-                  ["Flat Crush",`~${((mat?.ect||0)*0.7).toFixed(1)} kN/m`],
-                  ["Board Area",`${(2*(L*W+L*H+W*H)/1e4).toFixed(2)}m²`]].map(([l,vv])=>
-                  <div key={l} className="rounded-lg p-3" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                    <div className="text-xs" style={{color:TH.tf}}>{l}</div>
-                    <div className="font-mono font-bold mt-1 text-sm">{vv}</div></div>)}</div>
-                {/* Derating Factors */}
-                <h3 className="text-xs font-bold tracking-widest mb-2" style={{color:TH.tm}}>ENVIRONMENTAL DERATING FACTORS</h3>
-                <div className="rounded-lg overflow-hidden mb-4" style={{border:`1px solid ${TH.bd}`}}>
-                  <div className="grid grid-cols-3 px-3 py-1.5" style={{background:TH.bg3}}>
-                    <span className="text-xs font-bold" style={{color:TH.tm}}>Condition</span>
-                    <span className="text-xs font-bold text-center" style={{color:TH.tm}}>Factor</span>
-                    <span className="text-xs font-bold text-right" style={{color:TH.tm}}>Adj. Load</span></div>
-                  {[["High humidity (>80% RH)","×0.65"],["Long storage (>30 days)","×0.75"],["Transit/vibration","×0.60"],
-                    ["Pallet overhang","×0.70"],["High print coverage","×0.90"],["Temperature >40°C","×0.85"]].map(([cond,factor],i)=>{
-                    const adj=(parseFloat(bctData.safeLoad)*parseFloat(factor.slice(1))).toFixed(0);
-                    return <div key={cond} className="grid grid-cols-3 px-3 py-1.5" style={{background:i%2?TH.bg2:TH.bg1,borderTop:`1px solid ${TH.bd}`}}>
-                      <span className="text-xs" style={{color:TH.td}}>{cond}</span>
-                      <span className="text-xs font-mono font-bold text-center" style={{color:TH.rd}}>{factor}</span>
-                      <span className="text-xs font-mono text-right" style={{color:TH.or}}>{adj}N</span></div>})}
-                  <div className="grid grid-cols-3 px-3 py-2" style={{background:TH.bg3,borderTop:`1px solid ${TH.bd}`}}>
-                    <span className="text-xs font-bold" style={{color:TH.rd}}>Worst case (all)</span>
-                    <span className="text-xs font-mono font-bold text-center" style={{color:TH.rd}}>×0.20</span>
-                    <span className="text-xs font-mono font-bold text-right" style={{color:TH.rd}}>{(parseFloat(bctData.safeLoad)*0.20).toFixed(0)}N</span></div>
-                </div>
-                {/* Flute Direction */}
-                <div className="rounded-lg p-4 mb-4" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                  <h3 className="text-xs font-bold mb-2" style={{color:TH.tm}}>FLUTE DIRECTION & GRAIN</h3>
-                  <div className="text-xs" style={{color:TH.td}}>Flute direction runs <strong>parallel to the height</strong> (vertical on the dieline). This orientation maximizes stacking/compression strength because the flute columns resist top-to-bottom load. Shown as blue arrows on 2D dieline view.</div>
-                </div>
-                {/* Recommendations */}
-                <div className="rounded-lg p-4" style={{background:TH.gn+"11",border:`1px solid ${TH.gn}33`}}>
-                  <h3 className="text-xs font-bold mb-2" style={{color:TH.gn}}>RECOMMENDATIONS</h3>
-                  <div className="text-xs" style={{color:TH.td}}>
-                    {parseFloat(bctData.safeLoad)>500?"✓ Good compression strength for general shipping.":"⚠ Low compression — consider upgrading material."}<br/>
-                    {H/Math.min(L,W)>3?"⚠ Tall/narrow ratio — add internal partition or upgrade to double wall.":"✓ Proportions are structurally sound."}<br/>
-                    {T>=3?"✓ Material thickness adequate for stacking.":"⚠ Thin material — limit stack height or add edge protectors."}<br/>
-                    ✓ Always store on pallets, not directly on floor. Keep RH below 70% when possible.</div>
-                </div>
-              </>:<p className="text-sm" style={{color:TH.tf}}>Select a material to see structural data.</p>}
-            </div></div>}
-            {mTab==="compare"&&isEng&&<div className="p-5 overflow-y-auto h-full"><div className="max-w-4xl mx-auto">
-              <h2 className="text-lg font-bold mb-4" style={{color:TH.ac}}>Compare Box Types</h2>
-              <div className="mb-4">
-                <label className="text-xs font-bold tracking-widest mb-2 block" style={{color:TH.tm}}>COMPARE {bt?.name} WITH:</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {BOXES.filter(b=>b.id!==boxType).map(b=><button key={b.id} onClick={()=>setCompareId(b.id)}
-                    className="px-2.5 py-1.5 rounded-lg text-xs" style={{background:compareId===b.id?TH.ac+"22":TH.bg2,
-                      border:`1px solid ${compareId===b.id?TH.ac:TH.bd}`,color:compareId===b.id?TH.ac:TH.td}}>{b.name}</button>)}</div>
-              </div>
-              {compareId&&compareResult&&compareBox&&<div className="grid grid-cols-2 gap-4">
-                {/* Current */}
-                <div className="rounded-lg overflow-hidden" style={{border:`1px solid ${TH.ac}55`}}>
-                  <div className="px-3 py-2" style={{background:TH.ac+"15"}}><span className="text-xs font-bold" style={{color:TH.ac}}>{bt?.name} (Current)</span></div>
-                  <div className="p-3" style={{background:TH.bg2}}>
-                    {[["Dims",`${L.toFixed(0)}×${W.toFixed(0)}×${H.toFixed(0)}mm`],
-                      ["Sheet",r?`${r.width.toFixed(0)}×${r.height.toFixed(0)}mm`:"—"],
-                      ["Segments",r?.segments.length||0],
-                      ["Cut Length",segLens.cut?`${(segLens.cut/10).toFixed(0)}cm`:"—"],
-                      ["Weight",quote?`${quote.weight}g`:"—"],
-                      ["Unit Cost",quote?`$${quote.unitCost}`:"—"],
-                      ["BCT",bctData?`${bctData.bct}N`:"—"]
-                    ].map(([l,v])=><div key={l} className="flex justify-between py-1 border-b" style={{borderColor:TH.bd}}>
-                      <span className="text-xs" style={{color:TH.tf}}>{l}</span>
-                      <span className="text-xs font-mono font-bold">{v}</span></div>)}
-                  </div>
-                  {r&&<svg viewBox={`-5 -5 ${r.width+10} ${r.height+10}`} className="w-full" style={{background:TH.canvas,maxHeight:180}}>
-                    {r.segments.map((s,i)=><line key={i} x1={s.x1} y1={r.height-s.y1} x2={s.x2} y2={r.height-s.y2} stroke={LC[s.type]} strokeWidth={s.type==="cut"?1:.5} strokeLinecap="round"/>)}</svg>}
-                </div>
-                {/* Comparison */}
-                <div className="rounded-lg overflow-hidden" style={{border:`1px solid ${TH.bl}55`}}>
-                  <div className="px-3 py-2" style={{background:TH.bl+"15"}}><span className="text-xs font-bold" style={{color:TH.bl}}>{compareBox.name}</span></div>
-                  <div className="p-3" style={{background:TH.bg2}}>
-                    {(()=>{const cr=compareResult,cb=compareBox,cq=calcQuote(cr,mat,selFins,qty),cbct=calcBCT(cb.dL,cb.dW,cb.dH,mat);
-                      return[["Dims",`${cb.dL}×${cb.dW}×${cb.dH}mm`],
-                        ["Sheet",`${cr.width.toFixed(0)}×${cr.height.toFixed(0)}mm`],
-                        ["Segments",cr.segments.length],
-                        ["Cut Length",(()=>{let t=0;cr.segments.forEach(s=>{if(s.type==="cut")t+=Math.sqrt((s.x2-s.x1)**2+(s.y2-s.y1)**2)});return`${(t/10).toFixed(0)}cm`})()],
-                        ["Weight",cq?`${cq.weight}g`:"—"],
-                        ["Unit Cost",cq?`$${cq.unitCost}`:"—"],
-                        ["BCT",cbct?`${cbct.bct}N`:"—"]
-                      ].map(([l,v])=><div key={l} className="flex justify-between py-1 border-b" style={{borderColor:TH.bd}}>
-                        <span className="text-xs" style={{color:TH.tf}}>{l}</span>
-                        <span className="text-xs font-mono font-bold">{v}</span></div>)})()}
-                  </div>
-                  <svg viewBox={`-5 -5 ${compareResult.width+10} ${compareResult.height+10}`} className="w-full" style={{background:TH.canvas,maxHeight:180}}>
-                    {compareResult.segments.map((s,i)=><line key={i} x1={s.x1} y1={compareResult.height-s.y1} x2={s.x2} y2={compareResult.height-s.y2} stroke={LC[s.type]} strokeWidth={s.type==="cut"?1:.5} strokeLinecap="round"/>)}</svg>
-                </div>
-              </div>}
-              {!compareId&&<div className="rounded-lg p-8 text-center" style={{background:TH.bg2,border:`1px solid ${TH.bd}`}}>
-                <div className="text-2xl mb-2">⚖️</div>
-                <div className="text-sm" style={{color:TH.tf}}>Select a box type above to compare side-by-side</div>
-              </div>}
-            </div></div>}
-          </div>
-
-          <div className="flex items-center gap-3 px-4 py-1.5 flex-shrink-0" style={{background:TH.bg1,borderTop:`1px solid ${TH.bd}`}}>
-            {Object.entries(LC).filter(([t])=>sc[t]).map(([t,c])=><div key={t} className="flex items-center gap-1">
-              <div className="w-4 h-0.5" style={{background:c}}/><span className="text-xs" style={{color:TH.tm}}>{LL[t]} ({sc[t]})</span></div>)}
-            <div className="ml-auto flex items-center gap-3">
-              {r&&<span className="text-xs font-mono" style={{color:TH.tf}}>{r.width.toFixed(0)}×{r.height.toFixed(0)}mm · {r.segments.length} seg</span>}
-              <span className="text-xs" style={{color:TH.tf,opacity:.5}}>⌘E export · ⌘S save · ⌘R reset</span>
-            </div>
-          </div>
-        </div>
+          <div style={{fontWeight:800,fontSize:13,color:S.tm,marginBottom:8,marginTop:12,letterSpacing:1}}>ACTIONS</div>
+          {[{i:"💰",l:"Quote Details",d:unitCost?"$"+unitCost+"/unit":"—",f:()=>setSheet("quote")},
+            {i:"📊",l:"Structural Analysis",d:bctData?"BCT: "+bctData.bct+"N":"—",f:()=>setSheet("struct")},
+            {i:"💾",l:"Save Design",d:saved.length+" saved",f:handleSave},
+            {i:"📄",l:"Export Spec PDF",d:"Downloadable report",f:()=>doExport("spec-pdf")},
+            {i:"📄",l:"Structural PDF",d:"BCT + derating report",f:()=>doExport("struct-pdf")},
+            {i:"🎨",l:"Theme",d:dk?"Dark Mode":"Light Mode",f:()=>setDk(!dk)},
+          ].map(x=><button key={x.l} onClick={x.f} style={{display:"flex",alignItems:"center",gap:14,padding:16,borderRadius:16,background:S.bg2||S.c1,border:"1px solid "+S.bd,width:"100%",marginBottom:8,textAlign:"left"}}>
+            <span style={{fontSize:22}}>{x.i}</span>
+            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:15,color:S.tx}}>{x.l}</div><div style={{fontSize:12,color:S.tm}}>{x.d}</div></div>
+            <span style={{color:S.tm,fontSize:20}}>›</span></button>)}
+          {saved.length>0&&<><div style={{fontWeight:800,fontSize:13,color:S.tm,marginBottom:8,marginTop:8,letterSpacing:1}}>SAVED DESIGNS</div>
+            {saved.map(d=><div key={d.key} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:12,borderRadius:12,background:S.bg2||S.c1,border:"1px solid "+S.bd,marginBottom:6}}>
+              <button onClick={()=>{setBoxId(d.boxType||"0201");setDims(d.dims||{L:300,W:200,H:150});setMatId(d.matId||"B");setTab("design")}} style={{background:"none",border:"none",textAlign:"left",color:S.tx,flex:1}}>
+                <div style={{fontWeight:700,fontSize:14,color:S.ac}}>{d.name}</div>
+                <div style={{fontSize:11,color:S.tm}}>{new Date(d.ts).toLocaleDateString()}</div></button>
+              <button onClick={async()=>{await deleteDesign(d.key);setSaved(await loadDesigns())}} style={{color:S.rd,background:"none",border:"none",fontSize:16,padding:8}}>✕</button></div>)}</>}
+        </div>}
       </div>
+
+      {/* Bottom Tab Bar */}
+      <div style={{display:"flex",background:dk?"rgba(10,15,26,.92)":"rgba(248,250,252,.92)",borderTop:"1px solid "+S.bd,
+        backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",flexShrink:0,paddingBottom:"max(4px,env(safe-area-inset-bottom))"}}>
+        {[{id:"design",i:"✏️",l:"Design"},{id:"preview",i:"👁",l:"Preview"},{id:"specs",i:"📋",l:"Specs"},{id:"more",i:"⚙️",l:"More"}].map(t=>
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0 6px",background:"none",border:"none",color:tab===t.id?S.ac:(S.tm||S.t3)}}>
+            <span style={{fontSize:24}}>{t.i}</span><span style={{fontSize:10,fontWeight:tab===t.id?800:500}}>{t.l}</span></button>)}</div>
+
+      {/* Sheet Modals */}
+      {sheet==="export"&&<Sheet title="Export Dieline" onClose={()=>setSheet(null)}>
+        {[{f:"dxf",i:"📐",l:"DXF File",d:"CAD & die-cutting machines"},{f:"svg",i:"🖼",l:"SVG Vector",d:"Review & print"},
+          {f:"cff2",i:"⚙️",l:"CFF2 (Packaging)",d:"Die-cutter polyline format"},{f:"pdf",i:"🖨",l:"Print SVG + Marks",d:"Crop, registration, bleed"}].map(x=>
+          <button key={x.f} onClick={()=>{doExport(x.f);setSheet(null)}} style={{display:"flex",alignItems:"center",gap:16,padding:18,borderRadius:16,background:S.bg3||S.c2,border:"1px solid "+S.bd,width:"100%",marginBottom:10,textAlign:"left"}}>
+            <span style={{fontSize:28}}>{x.i}</span><div><div style={{fontWeight:700,fontSize:16,color:S.tx}}>{x.l}</div><div style={{fontSize:12,color:S.tm}}>{x.d}</div></div></button>)}
+      </Sheet>}
+
+      {sheet==="quote"&&<Sheet title="Quick Quote" onClose={()=>setSheet(null)}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+          <span style={{fontSize:13,color:S.tm}}>Qty:</span>
+          <input type="range" min="100" max="100000" step="100" value={qty} onChange={e=>setQty(parseInt(e.target.value))} style={{accentColor:S.ac}}/>
+          <input type="number" value={qty} onChange={e=>setQty(Math.max(1,parseInt(e.target.value)||1000))} style={{width:70,borderRadius:8,padding:"6px 8px",background:S.bg2||S.c1,border:"1px solid "+S.bd,color:S.tx,fontSize:13,fontFamily:"monospace",textAlign:"right",outline:"none"}}/></div>
+        {quote?<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {[["Unit Cost","$"+quote.unitCost],["Per "+qty.toLocaleString(),"$"+quote.per1k],["Weight",quote.weight+"g"],["Sheet",quote.sheetArea+"cm²"],["Die Saved","$"+(0.75*qty/1000).toFixed(0)],["Material",mat?.name]].map(([l,v])=>
+            <div key={l} style={{padding:16,borderRadius:14,background:S.bg2||S.c1,textAlign:"center"}}>
+              <div style={{fontSize:11,color:S.tm}}>{l}</div><div style={{fontSize:20,fontWeight:800,color:S.gn,fontFamily:"monospace",marginTop:4}}>{v}</div></div>)}
+        </div>:<div style={{textAlign:"center",color:S.tm,padding:20}}>Generate a design first</div>}
+      </Sheet>}
+
+      {sheet==="struct"&&<Sheet title="Structural Analysis" onClose={()=>setSheet(null)}>
+        {bctData?<>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            {[["BCT",bctData.bct+"N"],["Safe Load",bctData.safeLoad+"N"],["ECT",bctData.ect+"kN/m"],["Stack",bctData.stackHeight+" boxes"]].map(([l,v])=>
+              <div key={l} style={{padding:16,borderRadius:14,background:S.bg2||S.c1,textAlign:"center"}}>
+                <div style={{fontSize:11,color:S.tm}}>{l}</div><div style={{fontSize:22,fontWeight:900,color:S.gn,fontFamily:"monospace",marginTop:4}}>{v}</div></div>)}</div>
+          <div style={{fontWeight:800,fontSize:13,color:S.tm,marginBottom:8}}>DERATING FACTORS</div>
+          {[["Humidity >80%","×0.65"],["Storage >30d","×0.75"],["Transit","×0.60"],["Overhang","×0.70"],["Print >40%","×0.90"],["Temp >40°C","×0.85"]].map(([c,f],i)=>
+            <div key={c} style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:i%2?(S.bg2||S.c1):(S.bg1||S.c2),borderBottom:"1px solid "+S.bd}}>
+              <span style={{fontSize:13,color:S.td||S.t2}}>{c}</span>
+              <div style={{display:"flex",gap:12}}><span style={{fontSize:13,fontWeight:700,color:S.rd,fontFamily:"monospace"}}>{f}</span>
+                <span style={{fontSize:13,fontFamily:"monospace",color:S.or||S.ac}}>{(parseFloat(bctData.safeLoad)*parseFloat(f.slice(1))).toFixed(0)}N</span></div></div>)}
+          <button onClick={()=>{doExport("struct-pdf");setSheet(null)}} style={{width:"100%",marginTop:16,padding:14,borderRadius:12,background:S.rd+"22",border:"none",color:S.rd,fontWeight:700,fontSize:14}}>📄 Download Full Report PDF</button>
+        </>:<div style={{textAlign:"center",color:S.tm,padding:20}}>Select a material first</div>}
+      </Sheet>}
     </div>);
 }
-
-
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
 </script>
 </body>
