@@ -18,8 +18,8 @@ html,body,#root{height:100%;width:100%;overflow:hidden;font-family:-apple-system
 body{padding-top:env(safe-area-inset-top)}
 input[type=number]{-moz-appearance:textfield;font-family:'SF Mono',ui-monospace,monospace}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
-input[type=range]{-webkit-appearance:none;height:6px;border-radius:3px;background:#1e293b;outline:none;width:100%}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#f59e0b;border:3px solid #040810}
+input[type=range]{-webkit-appearance:none;height:6px;border-radius:3px;background:#1e293b;outline:none;width:100%;margin:10px 0;padding:12px 0;box-sizing:content-box;touch-action:pan-x}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;background:#f59e0b;border:3px solid #040810;margin-top:-11px;cursor:pointer}
 ::-webkit-scrollbar{display:none}
 @keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .sheet-anim{animation:sheetUp .25s ease-out}
@@ -677,6 +677,21 @@ async function deleteDesign(key){try{localStorage.removeItem(key)}catch(e){}}
 // ═══════════════════════════════════════════════════════════════
 
 
+// Sheet modal — MUST be defined outside App so React keeps it mounted across re-renders
+function Sheet({title,children,onClose,t}){
+  const sheetRef=useRef(null);
+  useEffect(()=>{const el=sheetRef.current;if(el){el.style.transform="translateY(100%)";requestAnimationFrame(()=>{el.style.transition="transform .25s ease-out";el.style.transform="translateY(0)"})}},[]);
+  return(
+  <div style={{position:"fixed",inset:0,zIndex:200}}>
+    <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.6)"}} onClick={onClose}/>
+    <div ref={sheetRef} style={{position:"absolute",bottom:0,left:0,right:0,background:t.bg1||t.c1,borderRadius:"24px 24px 0 0",maxHeight:"82vh",display:"flex",flexDirection:"column",paddingBottom:"max(16px,env(safe-area-inset-bottom))"}}>
+      <div style={{display:"flex",justifyContent:"center",padding:"10px 0 6px"}}><div style={{width:40,height:4,borderRadius:2,background:t.bd}}/></div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 20px 12px"}}>
+        <span style={{fontWeight:800,fontSize:18,color:t.tx}}>{title}</span>
+        <button onClick={onClose} style={{width:32,height:32,borderRadius:16,background:t.bg3||t.c2,border:"none",color:t.td||t.t2,fontSize:15,fontWeight:700}}>✕</button></div>
+      <div style={{overflow:"auto",padding:"0 20px 16px",flex:1,WebkitOverflowScrolling:"touch"}}>{children}</div>
+    </div></div>)}
+
 // ═══ MOBILE APP ═══
 function App(){
   const[dk,setDk]=useState(true);
@@ -697,6 +712,7 @@ function App(){
   const[aiLoading,setAiLoading]=useState(false);
   const[aiResult,setAiResult]=useState(null);
   const[saved,setSaved]=useState([]);
+  const[specView,setSpecView]=useState("specs");
   const canvasRef=useRef(null);
   const touchRef=useRef(null);
   const pinchRef=useRef(null);
@@ -737,22 +753,33 @@ function App(){
   // ── 3D Touch: native addEventListener, passive:false, refs for stable handlers ──
   const rotRef=useRef(rot);rotRef.current=rot;
   const zmRef=useRef(zm);zmRef.current=zm;
+  const dragRef=useRef(null);
   useEffect(()=>{
     const el=canvasRef.current;if(!el)return;
-    const onTS=e=>{
+    // Touch handlers (iOS Safari needs passive:false + preventDefault on BOTH start and move)
+    const onTS=e=>{e.preventDefault();e.stopPropagation();
       if(e.touches.length===1){const t=e.touches[0];touchRef.current={x:t.clientX,y:t.clientY,rx:rotRef.current.x,ry:rotRef.current.y}}
       if(e.touches.length===2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);pinchRef.current={d,z:zmRef.current}}};
-    const onTM=e=>{e.preventDefault();
+    const onTM=e=>{e.preventDefault();e.stopPropagation();
       if(e.touches.length===1&&touchRef.current){const t=e.touches[0];setRot({x:touchRef.current.rx+(t.clientY-touchRef.current.y)*.4,y:touchRef.current.ry+(t.clientX-touchRef.current.x)*.4})}
       if(e.touches.length===2&&pinchRef.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);setZm(Math.max(.3,Math.min(4,pinchRef.current.z*(d/pinchRef.current.d))))}};
-    const onTE=()=>{touchRef.current=null;pinchRef.current=null};
+    const onTE=e=>{touchRef.current=null;pinchRef.current=null};
+    // Mouse handlers (desktop/simulator fallback)
+    const onMD=e=>{e.preventDefault();dragRef.current={x:e.clientX,y:e.clientY,rx:rotRef.current.x,ry:rotRef.current.y}};
+    const onMM=e=>{if(!dragRef.current)return;setRot({x:dragRef.current.rx+(e.clientY-dragRef.current.y)*.4,y:dragRef.current.ry+(e.clientX-dragRef.current.x)*.4})};
+    const onMU=()=>{dragRef.current=null};
     const onWh=e=>{e.preventDefault();setZm(z=>Math.max(.3,Math.min(4,z-e.deltaY*.002)))};
     el.addEventListener("touchstart",onTS,{passive:false});
     el.addEventListener("touchmove",onTM,{passive:false});
     el.addEventListener("touchend",onTE,{passive:true});
+    el.addEventListener("mousedown",onMD);
+    el.addEventListener("mousemove",onMM);
+    el.addEventListener("mouseup",onMU);
+    el.addEventListener("mouseleave",onMU);
     el.addEventListener("wheel",onWh,{passive:false});
-    return()=>{el.removeEventListener("touchstart",onTS);el.removeEventListener("touchmove",onTM);el.removeEventListener("touchend",onTE);el.removeEventListener("wheel",onWh)};
-  },[]);
+    return()=>{el.removeEventListener("touchstart",onTS);el.removeEventListener("touchmove",onTM);el.removeEventListener("touchend",onTE);
+      el.removeEventListener("mousedown",onMD);el.removeEventListener("mousemove",onMM);el.removeEventListener("mouseup",onMU);el.removeEventListener("mouseleave",onMU);el.removeEventListener("wheel",onWh)};
+  },[tab,pm]);
 
   // AI handler
   const handleAI=useCallback(async(e,type)=>{
@@ -776,28 +803,18 @@ function App(){
   // ── Components ──
   const S=T_; // theme shorthand
   const Dim=({label,k})=>(
-    <div style={{background:S.bg2||S.c1,borderRadius:14,border:"1px solid "+(S.bd),padding:"12px 16px",marginBottom:8}}>
+    <div style={{background:S.bg2||S.c1,borderRadius:14,border:"1px solid "+(S.bd),padding:"12px 14px",marginBottom:8,overflow:"hidden"}}>
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
         <span style={{fontSize:12,fontWeight:700,color:S.tm,letterSpacing:1}}>{label}</span><span style={{fontSize:11,color:S.tm}}>mm</span></div>
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,overflow:"hidden"}}>
         <button onClick={()=>setDims(d=>({...d,[k]:Math.max(0,d[k]-5)}))}
           style={{width:44,height:44,borderRadius:12,background:S.bg3||S.c2,border:"1px solid "+S.bd,color:S.ac,fontSize:22,fontWeight:700,flexShrink:0}}>−</button>
         <input type="number" value={dims[k]} onChange={e=>setDims(d=>({...d,[k]:Math.max(0,parseFloat(e.target.value)||0)}))}
-          style={{flex:1,background:"none",border:"none",color:S.tx,fontSize:28,fontWeight:800,textAlign:"center",outline:"none"}}/>
+          style={{flex:1,minWidth:0,background:"none",border:"none",color:S.tx,fontSize:26,fontWeight:800,textAlign:"center",outline:"none",width:"100%"}}/>
         <button onClick={()=>setDims(d=>({...d,[k]:d[k]+5}))}
           style={{width:44,height:44,borderRadius:12,background:S.bg3||S.c2,border:"1px solid "+S.bd,color:S.ac,fontSize:22,fontWeight:700,flexShrink:0}}>+</button>
       </div></div>);
 
-  const Sheet=({title,children,onClose})=>(
-    <div style={{position:"fixed",inset:0,zIndex:200}} onClick={onClose}>
-      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.6)"}}/>
-      <div className="sheet-anim" onClick={e=>e.stopPropagation()} style={{position:"absolute",bottom:0,left:0,right:0,background:S.bg1||S.c1,borderRadius:"24px 24px 0 0",maxHeight:"82vh",display:"flex",flexDirection:"column",paddingBottom:"max(16px,env(safe-area-inset-bottom))"}}>
-        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 6px"}}><div style={{width:40,height:4,borderRadius:2,background:S.bd}}/></div>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 20px 12px"}}>
-          <span style={{fontWeight:800,fontSize:18,color:S.tx}}>{title}</span>
-          <button onClick={onClose} style={{width:32,height:32,borderRadius:16,background:S.bg3||S.c2,border:"none",color:S.td||S.t2,fontSize:15,fontWeight:700}}>✕</button></div>
-        <div style={{overflow:"auto",padding:"0 20px 16px",flex:1,WebkitOverflowScrolling:"touch"}}>{children}</div>
-      </div></div>);
 
   // ── 3D Render (inline for mobile) ──
   const render3D=()=>{
@@ -902,12 +919,12 @@ function App(){
           <div style={{display:"flex",gap:6,padding:"6px 16px",flexShrink:0}}>
             {[["2d","2D Dieline"],["3d","3D Interactive"]].map(([k,l])=><button key={k} onClick={()=>setPm(k)}
               style={{flex:1,padding:12,borderRadius:12,background:pm===k?S.ac:(S.bg3||S.c2),border:"none",color:pm===k?"#000":(S.td||S.t2),fontSize:15,fontWeight:700}}>{l}</button>)}</div>
-          <div ref={canvasRef} style={{flex:1,overflow:"hidden",margin:"6px 12px 8px",borderRadius:16,border:"1px solid "+S.bd,touchAction:"none"}}>
+          <div ref={canvasRef} style={{flex:1,overflow:"hidden",margin:"6px 12px 8px",borderRadius:16,border:"1px solid "+S.bd,touchAction:"none",cursor:pm==="3d"?"grab":"default",userSelect:"none",WebkitUserSelect:"none"}}>
             {!r?<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",color:S.tm}}>Fix dimensions to preview</div>
             :pm==="2d"?(()=>{const{segments:ss,width:ww,height:hh}=r;const p=10;
               const dm={cut:"none",fold:"6,3",crease:"8,3,2,3",glue:"3,3",perf:"2,4",tongue:"4,2",groove:"2,2,6,2"};
               const sw2={cut:1.2,fold:.7,crease:.5,glue:.5,perf:.6,tongue:1,groove:.8};
-              return <svg viewBox={-p+" "+(-p)+" "+(ww+p*2)+" "+(hh+p*2)} style={{width:"100%",height:"100%",background:S.canvas||"#0d1117"}}>
+              return <svg viewBox={-p+" "+(-p)+" "+(ww+p*2)+" "+(hh+p*2)} style={{width:"100%",height:"100%",background:S.canvas||"#0d1117",pointerEvents:"none"}}>
                 <defs><pattern id="gr" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke={S.bd} strokeWidth=".15"/></pattern></defs>
                 <rect x={-p*4} y={-p*4} width={(ww+p*2)*4} height={(hh+p*2)*4} fill="url(#gr)"/>
                 {ss.map((s,i)=><line key={i} x1={s.x1} y1={hh-s.y1} x2={s.x2} y2={hh-s.y2} stroke={LC[s.type]} strokeWidth={sw2[s.type]||.6} strokeDasharray={dm[s.type]} strokeLinecap="round"/>)}
@@ -920,20 +937,151 @@ function App(){
         </div>}
 
         {tab==="specs"&&<div style={{flex:1,overflow:"auto",padding:"0 16px 16px",WebkitOverflowScrolling:"touch"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <div><div style={{fontWeight:800,fontSize:20,color:S.ac}}>{bt?.name}</div>
-              <div style={{fontSize:13,color:S.td||S.t2}}>{bt?.sub} — {bt?.desc}</div></div>
-            <button onClick={()=>doExport("spec-pdf")} style={{padding:"8px 12px",borderRadius:10,background:(S.rd||"#ef4444")+"22",color:S.rd,border:"none",fontSize:12,fontWeight:700,flexShrink:0}}>📄 PDF</button></div>
-          {[["L",L+"mm"],["W",W+"mm"],["H",H+"mm"],["Vol",((L*W*H)/1e6).toFixed(2)+"L"],["Mat",mat?.name],["T",mT+"mm"]].map(([l,v])=>
-            <div key={l} style={{display:"inline-block",width:"32%",padding:10,borderRadius:10,background:S.bg2||S.c1,border:"1px solid "+S.bd,marginBottom:4,marginRight:"1%",verticalAlign:"top"}}>
-              <div style={{fontSize:10,color:S.tm}}>{l}</div><div style={{fontSize:16,fontWeight:800,fontFamily:"monospace"}}>{v}</div></div>)}
-          {quote&&<div style={{marginTop:8}}>{[["Weight",quote.weight+"g"],["Sheet",quote.sheetArea+"cm²"],["Cost","$"+unitCost],["Segs",r?.segments.length]].map(([l,v])=>
-            <div key={l} style={{display:"inline-block",width:"24%",padding:8,borderRadius:10,background:S.bg2||S.c1,border:"1px solid "+S.bd,marginBottom:4,marginRight:"1%",textAlign:"center"}}>
-              <div style={{fontSize:10,color:S.tm}}>{l}</div><div style={{fontSize:14,fontWeight:800,fontFamily:"monospace",color:S.gn}}>{v}</div></div>)}</div>}
-          {r&&<div style={{marginTop:12,borderRadius:12,overflow:"hidden",border:"1px solid "+S.bd}}>
-            {Object.entries(segC).map(([t,cnt],i)=><div key={t} style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:i%2?(S.bg2||S.c1):(S.bg1||S.c2),borderBottom:"1px solid "+S.bd}}>
-              <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:14,height:4,borderRadius:2,background:LC[t]}}/><span style={{fontSize:13,color:S.td||S.t2}}>{LL[t]}</span></div>
-              <div style={{display:"flex",gap:12}}><span style={{fontSize:12,fontFamily:"monospace",color:S.tm}}>{segLens[t]?(segLens[t]/10).toFixed(0)+"cm":""}</span><span style={{fontSize:13,fontWeight:700,fontFamily:"monospace"}}>{cnt}</span></div></div>)}</div>}
+          {/* Specs / Structural toggle */}
+          <div style={{display:"flex",gap:6,marginBottom:12}}>
+            {[["specs","📋 Specs"],["struct","📊 Structural"]].map(([k,l])=>
+              <button key={k} onClick={()=>setSpecView(k)} style={{flex:1,padding:12,borderRadius:12,background:specView===k?S.ac:(S.bg3||S.c2),border:"none",color:specView===k?"#000":(S.td||S.t2),fontSize:14,fontWeight:700}}>{l}</button>)}</div>
+
+          {specView==="specs"&&<>
+            {/* Header */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div><div style={{fontWeight:800,fontSize:20,color:S.ac}}>{bt?.name}</div>
+                <div style={{fontSize:13,color:S.td||S.t2}}>{bt?.sub} — {bt?.desc}</div></div>
+              <button onClick={()=>doExport("spec-pdf")} style={{padding:"8px 12px",borderRadius:10,background:(S.rd||"#ef4444")+"22",color:S.rd,border:"none",fontSize:12,fontWeight:700,flexShrink:0}}>📄 PDF</button></div>
+
+            {/* External Dimensions */}
+            <div style={{fontWeight:800,fontSize:11,color:S.tm,marginBottom:6,letterSpacing:2}}>EXTERNAL DIMENSIONS</div>
+            <div style={{display:"flex",gap:6,marginBottom:12}}>
+              {[["L",L+"mm"],["W",W+"mm"],["H",H+"mm"]].map(([l,v])=>
+                <div key={l} style={{flex:1,padding:12,borderRadius:12,background:S.bg2||S.c1,border:"1px solid "+S.bd,textAlign:"center"}}>
+                  <div style={{fontSize:10,color:S.tm}}>{l}</div><div style={{fontSize:22,fontWeight:900,fontFamily:"monospace"}}>{v}</div></div>)}</div>
+
+            {/* Internal Dimensions */}
+            <div style={{fontWeight:800,fontSize:11,color:S.tm,marginBottom:6,letterSpacing:2}}>INTERNAL DIMENSIONS</div>
+            <div style={{display:"flex",gap:6,marginBottom:12}}>
+              {[["Int.L",(L-mT*2).toFixed(0)+"mm"],["Int.W",(W-mT*2).toFixed(0)+"mm"],["Int.H",(H-mT).toFixed(0)+"mm"],["Vol",((L-mT*2)*(W-mT*2)*(H-mT)/1e6).toFixed(2)+"L"]].map(([l,v])=>
+                <div key={l} style={{flex:1,padding:8,borderRadius:10,background:S.bg2||S.c1,border:"1px solid "+S.bd,textAlign:"center"}}>
+                  <div style={{fontSize:9,color:S.tm}}>{l}</div><div style={{fontSize:13,fontWeight:800,fontFamily:"monospace"}}>{v}</div></div>)}</div>
+
+            {/* Material */}
+            <div style={{fontWeight:800,fontSize:11,color:S.tm,marginBottom:6,letterSpacing:2}}>MATERIAL & CONSTRUCTION</div>
+            <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+              {[["Material",mat?.name||"—"],["Thick",mT+"mm"],["GSM",""+mat?.gsm],["ECT",(mat?.ect||0)+"kN/m"],
+                ["Strength","★".repeat(mat?.str||0)+"☆".repeat(5-(mat?.str||0))],["Print","★".repeat(mat?.prt||0)+"☆".repeat(5-(mat?.prt||0))]].map(([l,v])=>
+                <div key={l} style={{width:"31%",padding:8,borderRadius:10,background:S.bg2||S.c1,border:"1px solid "+S.bd,marginBottom:4}}>
+                  <div style={{fontSize:9,color:S.tm}}>{l}</div><div style={{fontSize:12,fontWeight:700,fontFamily:"monospace"}}>{v}</div></div>)}</div>
+
+            {/* Surface Area */}
+            {(()=>{const sa=2*(L*W+L*H+W*H);return <div style={{display:"flex",gap:6,marginBottom:12}}>
+              {[["Surface",(sa/100).toFixed(0)+"cm²"],["Print Area",(sa*.85/100).toFixed(0)+"cm²"],["Ext Vol",((L*W*H)/1e6).toFixed(2)+"L"]].map(([l,v])=>
+                <div key={l} style={{flex:1,padding:8,borderRadius:10,background:S.bg2||S.c1,border:"1px solid "+S.bd,textAlign:"center"}}>
+                  <div style={{fontSize:9,color:S.tm}}>{l}</div><div style={{fontSize:13,fontWeight:700,fontFamily:"monospace"}}>{v}</div></div>)}</div>})()}
+
+            {/* Production Metrics */}
+            {quote&&<><div style={{fontWeight:800,fontSize:11,color:S.tm,marginBottom:6,letterSpacing:2}}>PRODUCTION METRICS</div>
+            <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+              {[["Sheet",r?r.width.toFixed(0)+"×"+r.height.toFixed(0)+"mm":"—"],["Area",quote.sheetArea+"cm²"],["Weight",quote.weight+"g"],
+                ["Utilization",(()=>{if(!r)return"—";const u=Math.min(99,Math.round(2*(L*W+L*H+W*H)/(r.width*r.height)*100));return u+"%"})()],
+                ["Cut Len",totalCutLen?(totalCutLen/1000).toFixed(1)+"m":"—"],["Segments",r?r.segments.length:"—"],
+                ["Unit $","$"+quote.unitCost],["Per "+qty.toLocaleString(),"$"+quote.per1k]].map(([l,v])=>
+                <div key={l} style={{width:"24%",padding:8,borderRadius:10,background:S.bg2||S.c1,border:"1px solid "+S.bd,marginBottom:4,textAlign:"center"}}>
+                  <div style={{fontSize:9,color:S.tm}}>{l}</div><div style={{fontSize:12,fontWeight:800,fontFamily:"monospace",color:S.gn}}>{v}</div></div>)}</div></>}
+
+            {/* Panel Analysis */}
+            <div style={{fontWeight:800,fontSize:11,color:S.tm,marginBottom:6,letterSpacing:2}}>PANEL ANALYSIS</div>
+            <div style={{borderRadius:12,overflow:"hidden",border:"1px solid "+S.bd,marginBottom:12}}>
+              {[["Front",W,H],["Back",W,H],["Left",L,H],["Right",L,H],["Top Flap",L,W/2],["Bot Flap",L,W/2],["Side Flap",W,W/2],["Glue Tab",GW,H]].map(([n,pw,ph],i)=>
+                <div key={n} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:i%2?(S.bg2||S.c1):(S.bg1||S.c2),borderBottom:"1px solid "+S.bd}}>
+                  <span style={{fontSize:12,color:S.td||S.t2,flex:1}}>{n}</span>
+                  <span style={{fontSize:11,fontFamily:"monospace",width:55,textAlign:"right"}}>{pw.toFixed(0)}×{ph.toFixed(0)}</span>
+                  <span style={{fontSize:11,fontFamily:"monospace",color:S.gn,width:50,textAlign:"right"}}>{(pw*ph/100).toFixed(0)}cm²</span></div>)}</div>
+
+            {/* Segment Breakdown */}
+            <div style={{fontWeight:800,fontSize:11,color:S.tm,marginBottom:6,letterSpacing:2}}>SEGMENT BREAKDOWN</div>
+            <div style={{borderRadius:12,overflow:"hidden",border:"1px solid "+S.bd,marginBottom:12}}>
+              {Object.entries(segC).map(([t,cnt],i)=>{const len=segLens[t]||0;
+                return <div key={t} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",background:i%2?(S.bg2||S.c1):(S.bg1||S.c2),borderBottom:"1px solid "+S.bd}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flex:1}}><div style={{width:14,height:4,borderRadius:2,background:LC[t]}}/><span style={{fontSize:12,color:S.td||S.t2}}>{LL[t]}</span></div>
+                  <span style={{fontSize:11,fontFamily:"monospace",color:S.tm,width:40,textAlign:"right"}}>{(len/10).toFixed(0)}cm</span>
+                  <span style={{fontSize:11,fontFamily:"monospace",color:S.tm,width:30,textAlign:"right"}}>{totalCutLen?(len/totalCutLen*100).toFixed(0):0}%</span>
+                  <span style={{fontSize:13,fontWeight:700,fontFamily:"monospace",width:30,textAlign:"right"}}>{cnt}</span></div>})}</div>
+
+            {/* Shipping */}
+            <div style={{fontWeight:800,fontSize:11,color:S.tm,marginBottom:6,letterSpacing:2}}>SHIPPING & LOGISTICS</div>
+            {(()=>{const pL=1200,pW=1000,pH=1800;const perL=Math.floor(pL/L)*Math.floor(pW/W);const layers=Math.floor(pH/H);
+              return <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+                {[["Per Pallet","~"+(perL*layers)],["Per Layer",perL],["Layers",layers]].map(([l,v])=>
+                  <div key={l} style={{flex:1,padding:8,borderRadius:10,background:S.bg2||S.c1,border:"1px solid "+S.bd,textAlign:"center"}}>
+                    <div style={{fontSize:9,color:S.tm}}>{l}</div><div style={{fontSize:14,fontWeight:800,fontFamily:"monospace"}}>{v}</div></div>)}</div>})()}
+
+            {/* Blade + Finishes */}
+            <div style={{fontWeight:800,fontSize:11,color:S.tm,marginBottom:6,letterSpacing:2}}>BLADE CONFIG</div>
+            <div style={{display:"flex",gap:6,marginBottom:12}}>
+              {[["Type",bt2],["Kerf",bk+"mm"],["Angle",ba+"°"]].map(([l,v])=>
+                <div key={l} style={{flex:1,padding:8,borderRadius:10,background:S.bg2||S.c1,border:"1px solid "+S.bd,textAlign:"center"}}>
+                  <div style={{fontSize:9,color:S.tm}}>{l}</div><div style={{fontSize:13,fontWeight:700,fontFamily:"monospace",color:S.or||S.ac}}>{v}</div></div>)}</div>
+            {selFins.length>0&&<><div style={{fontWeight:800,fontSize:11,color:S.tm,marginBottom:6,letterSpacing:2}}>FINISHES ({selFins.length})</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+                {selFins.map(fid=>{const f=FINS.find(x=>x.id===fid);return f?<span key={fid} style={{fontSize:12,padding:"6px 12px",borderRadius:8,background:S.bg2||S.c1,border:"1px solid "+S.bd}}>{f.name}</span>:null})}</div></>}
+          </>}
+
+          {specView==="struct"&&<>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontWeight:800,fontSize:20,color:S.ac}}>Structural Analysis</div>
+              {bctData&&<button onClick={()=>doExport("struct-pdf")} style={{padding:"8px 12px",borderRadius:10,background:(S.rd||"#ef4444")+"22",color:S.rd,border:"none",fontSize:12,fontWeight:700,flexShrink:0}}>📄 PDF</button>}</div>
+
+            {bctData?<>
+              {/* Key metrics */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+                {[["BCT (McKee)",bctData.bct+" N"],["Safe Load (65%)",bctData.safeLoad+" N"],["ECT",bctData.ect+" kN/m"],["Stack Height","~"+bctData.stackHeight+" boxes"]].map(([l,v])=>
+                  <div key={l} style={{padding:16,borderRadius:14,background:S.bg2||S.c1,border:"1px solid "+S.bd,textAlign:"center"}}>
+                    <div style={{fontSize:10,color:S.tm}}>{l}</div>
+                    <div style={{fontSize:24,fontWeight:900,fontFamily:"monospace",color:S.gn,marginTop:4}}>{v}</div></div>)}</div>
+
+              {/* McKee formula */}
+              <div style={{padding:16,borderRadius:14,background:S.bg2||S.c1,border:"1px solid "+S.bd,marginBottom:16}}>
+                <div style={{fontSize:11,fontWeight:800,color:S.tm,marginBottom:6}}>McKee Formula</div>
+                <div style={{fontSize:16,fontFamily:"monospace",color:S.ac,fontWeight:700,marginBottom:8}}>BCT = 5.87 × ECT × √(Z × P)</div>
+                <div style={{fontSize:12,color:S.tf||S.tm,lineHeight:1.8}}>
+                  ECT = {bctData.ect} kN/m ({mat?.name})<br/>
+                  Z = {mT}mm (caliper)<br/>
+                  P = {(2*(L+W)).toFixed(0)}mm (2×{L} + 2×{W})</div></div>
+
+              {/* Additional metrics */}
+              <div style={{fontWeight:800,fontSize:11,color:S.tm,marginBottom:6,letterSpacing:2}}>ADDITIONAL METRICS</div>
+              <div style={{display:"flex",gap:6,marginBottom:16}}>
+                {[["Burst",((mat?.ect||0)*1.6*mT).toFixed(0)+" kPa"],["Flat Crush",((mat?.ect||0)*0.7).toFixed(1)+" kN/m"],["Board",((2*(L*W+L*H+W*H))/1e4).toFixed(2)+"m²"]].map(([l,v])=>
+                  <div key={l} style={{flex:1,padding:10,borderRadius:12,background:S.bg2||S.c1,border:"1px solid "+S.bd,textAlign:"center"}}>
+                    <div style={{fontSize:9,color:S.tm}}>{l}</div><div style={{fontSize:14,fontWeight:800,fontFamily:"monospace"}}>{v}</div></div>)}</div>
+
+              {/* Derating factors */}
+              <div style={{fontWeight:800,fontSize:11,color:S.tm,marginBottom:6,letterSpacing:2}}>ENVIRONMENTAL DERATING</div>
+              <div style={{borderRadius:12,overflow:"hidden",border:"1px solid "+S.bd,marginBottom:16}}>
+                {[["Humidity >80% RH","×0.65"],["Storage >30 days","×0.75"],["Transit / vibration","×0.60"],["Pallet overhang","×0.70"],["Print coverage >40%","×0.90"],["Temperature >40°C","×0.85"]].map(([cond,factor],i)=>{
+                  const adj=(parseFloat(bctData.safeLoad)*parseFloat(factor.slice(1))).toFixed(0);
+                  return <div key={cond} style={{display:"flex",justifyContent:"space-between",padding:"10px 12px",background:i%2?(S.bg2||S.c1):(S.bg1||S.c2),borderBottom:"1px solid "+S.bd}}>
+                    <span style={{fontSize:12,color:S.td||S.t2,flex:1}}>{cond}</span>
+                    <span style={{fontSize:12,fontWeight:700,color:S.rd,fontFamily:"monospace",width:40,textAlign:"center"}}>{factor}</span>
+                    <span style={{fontSize:12,fontFamily:"monospace",color:S.or||S.ac,width:50,textAlign:"right"}}>{adj}N</span></div>})}
+                <div style={{display:"flex",justifyContent:"space-between",padding:"10px 12px",background:S.bg3||S.c2,borderTop:"1px solid "+S.bd}}>
+                  <span style={{fontSize:12,fontWeight:800,color:S.rd}}>Worst case (all factors)</span>
+                  <span style={{fontSize:12,fontWeight:800,fontFamily:"monospace",color:S.rd}}>{(parseFloat(bctData.safeLoad)*0.20).toFixed(0)}N</span></div></div>
+
+              {/* Flute direction */}
+              <div style={{padding:14,borderRadius:14,background:S.bg2||S.c1,border:"1px solid "+S.bd,marginBottom:16}}>
+                <div style={{fontSize:11,fontWeight:800,color:S.tm,marginBottom:4}}>FLUTE DIRECTION</div>
+                <div style={{fontSize:12,color:S.td||S.t2,lineHeight:1.6}}>Flute runs <b>parallel to height</b> (vertical on dieline). This maximizes stacking strength — flute columns resist top-to-bottom compression. Shown as blue arrows on 2D view.</div></div>
+
+              {/* Recommendations */}
+              <div style={{padding:14,borderRadius:14,background:S.gn+"11",border:"1px solid "+S.gn+"33",marginBottom:16}}>
+                <div style={{fontSize:11,fontWeight:800,color:S.gn,marginBottom:6}}>RECOMMENDATIONS</div>
+                <div style={{fontSize:12,color:S.td||S.t2,lineHeight:1.6}}>
+                  {parseFloat(bctData.safeLoad)>500?"✓ Good compression for general shipping.":"⚠ Low compression — consider upgrading material."}<br/>
+                  {H/Math.min(L,W)>3?"⚠ Tall/narrow — add partition or upgrade to double wall.":"✓ Proportions structurally sound."}<br/>
+                  {mT>=3?"✓ Thickness adequate for stacking.":"⚠ Thin material — limit stack height."}<br/>
+                  ✓ Store on pallets. Keep RH below 70%.</div></div>
+            </>:<div style={{padding:40,textAlign:"center",color:S.tm}}>Select a material to see structural data</div>}
+          </>}
         </div>}
 
         {tab==="more"&&<div style={{flex:1,overflow:"auto",padding:"0 16px 16px",WebkitOverflowScrolling:"touch"}}>
@@ -983,18 +1131,30 @@ function App(){
             <span style={{fontSize:24}}>{t.i}</span><span style={{fontSize:10,fontWeight:tab===t.id?800:500}}>{t.l}</span></button>)}</div>
 
       {/* Sheet Modals */}
-      {sheet==="export"&&<Sheet title="Export Dieline" onClose={()=>setSheet(null)}>
+      {sheet==="export"&&<Sheet title="Export Dieline" onClose={()=>setSheet(null)} t={S}>
         {[{f:"dxf",i:"📐",l:"DXF File",d:"CAD & die-cutting machines"},{f:"svg",i:"🖼",l:"SVG Vector",d:"Review & print"},
           {f:"cff2",i:"⚙️",l:"CFF2 (Packaging)",d:"Die-cutter polyline format"},{f:"pdf",i:"🖨",l:"Print SVG + Marks",d:"Crop, registration, bleed"}].map(x=>
           <button key={x.f} onClick={()=>{doExport(x.f);setSheet(null)}} style={{display:"flex",alignItems:"center",gap:16,padding:18,borderRadius:16,background:S.bg3||S.c2,border:"1px solid "+S.bd,width:"100%",marginBottom:10,textAlign:"left"}}>
             <span style={{fontSize:28}}>{x.i}</span><div><div style={{fontWeight:700,fontSize:16,color:S.tx}}>{x.l}</div><div style={{fontSize:12,color:S.tm}}>{x.d}</div></div></button>)}
       </Sheet>}
 
-      {sheet==="quote"&&<Sheet title="Quick Quote" onClose={()=>setSheet(null)}>
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
-          <span style={{fontSize:13,color:S.tm}}>Qty:</span>
-          <input type="range" min="100" max="100000" step="100" value={qty} onChange={e=>setQty(parseInt(e.target.value))} style={{accentColor:S.ac}}/>
-          <input type="number" value={qty} onChange={e=>setQty(Math.max(1,parseInt(e.target.value)||1000))} style={{width:70,borderRadius:8,padding:"6px 8px",background:S.bg2||S.c1,border:"1px solid "+S.bd,color:S.tx,fontSize:13,fontFamily:"monospace",textAlign:"right",outline:"none"}}/></div>
+      {sheet==="quote"&&<Sheet title="Quick Quote" onClose={()=>setSheet(null)} t={S}>
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:12,color:S.tm,marginBottom:8}}>QUANTITY</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+            {[100,250,500,1000,2500,5000,10000,25000,50000,100000].map(q=>
+              <button key={q} onClick={()=>setQty(q)} style={{padding:"10px 0",flex:"1 1 22%",borderRadius:10,
+                background:qty===q?S.ac+"25":(S.bg3||S.c2),border:qty===q?"2px solid "+S.ac:"2px solid "+S.bd,
+                color:qty===q?S.ac:(S.td||S.t2),fontSize:12,fontWeight:qty===q?800:600,fontFamily:"monospace"}}>
+                {q>=1000?(q/1000)+"K":q}</button>)}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:12,color:S.tm}}>Custom:</span>
+            <input type="number" value={qty} onChange={e=>setQty(Math.max(1,parseInt(e.target.value)||1000))}
+              style={{flex:1,borderRadius:10,padding:"10px 12px",background:S.bg2||S.c1,border:"1px solid "+S.bd,color:S.tx,fontSize:16,fontFamily:"monospace",textAlign:"center",outline:"none"}}/>
+            <span style={{fontSize:12,color:S.tm}}>units</span>
+          </div>
+        </div>
         {quote?<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           {[["Unit Cost","$"+quote.unitCost],["Per "+qty.toLocaleString(),"$"+quote.per1k],["Weight",quote.weight+"g"],["Sheet",quote.sheetArea+"cm²"],["Die Saved","$"+(0.75*qty/1000).toFixed(0)],["Material",mat?.name]].map(([l,v])=>
             <div key={l} style={{padding:16,borderRadius:14,background:S.bg2||S.c1,textAlign:"center"}}>
@@ -1002,7 +1162,7 @@ function App(){
         </div>:<div style={{textAlign:"center",color:S.tm,padding:20}}>Generate a design first</div>}
       </Sheet>}
 
-      {sheet==="struct"&&<Sheet title="Structural Analysis" onClose={()=>setSheet(null)}>
+      {sheet==="struct"&&<Sheet title="Structural Analysis" onClose={()=>setSheet(null)} t={S}>
         {bctData?<>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
             {[["BCT",bctData.bct+"N"],["Safe Load",bctData.safeLoad+"N"],["ECT",bctData.ect+"kN/m"],["Stack",bctData.stackHeight+" boxes"]].map(([l,v])=>
