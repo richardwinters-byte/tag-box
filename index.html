@@ -741,6 +741,8 @@ function App(){
   const aiFileRef=useRef(null);
   const aiImgRef=useRef(null);
   const logoRef=useRef(null);
+  const artDragRef=useRef(null);
+  const svgRef=useRef(null);
 
   const S=dk?DARK:LIGHT;
   const mat=MATS.find(m=>m.id===matId);const mT=mat?.t||3;
@@ -781,15 +783,16 @@ function App(){
   // 3D touch
   const rotRef=useRef(rot);rotRef.current=rot;const zmRef=useRef(zm);zmRef.current=zm;const dragRef=useRef(null);
   useEffect(()=>{const el=canvasRef.current;if(!el)return;
-    const onTS=e=>{e.preventDefault();if(e.touches.length===1){const t=e.touches[0];touchRef.current={x:t.clientX,y:t.clientY,rx:rotRef.current.x,ry:rotRef.current.y}}
+    const isBtn=e=>e.target&&(e.target.tagName==="BUTTON"||e.target.closest("button"));
+    const onTS=e=>{if(isBtn(e)||pm!=="3d")return;e.preventDefault();if(e.touches.length===1){const t=e.touches[0];touchRef.current={x:t.clientX,y:t.clientY,rx:rotRef.current.x,ry:rotRef.current.y}}
       if(e.touches.length===2){pinchRef.current={d:Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY),z:zmRef.current}}};
-    const onTM=e=>{e.preventDefault();if(e.touches.length===1&&touchRef.current){const t=e.touches[0];setRot({x:touchRef.current.rx+(t.clientY-touchRef.current.y)*.4,y:touchRef.current.ry+(t.clientX-touchRef.current.x)*.4})}
+    const onTM=e=>{if(pm!=="3d")return;e.preventDefault();if(e.touches.length===1&&touchRef.current){const t=e.touches[0];setRot({x:touchRef.current.rx+(t.clientY-touchRef.current.y)*.4,y:touchRef.current.ry+(t.clientX-touchRef.current.x)*.4})}
       if(e.touches.length===2&&pinchRef.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);setZm(Math.max(.3,Math.min(4,pinchRef.current.z*(d/pinchRef.current.d))))}};
     const onTE=()=>{touchRef.current=null;pinchRef.current=null};
-    const onMD=e=>{e.preventDefault();dragRef.current={x:e.clientX,y:e.clientY,rx:rotRef.current.x,ry:rotRef.current.y}};
+    const onMD=e=>{if(isBtn(e)||pm!=="3d")return;e.preventDefault();dragRef.current={x:e.clientX,y:e.clientY,rx:rotRef.current.x,ry:rotRef.current.y}};
     const onMM=e=>{if(!dragRef.current)return;setRot({x:dragRef.current.rx+(e.clientY-dragRef.current.y)*.4,y:dragRef.current.ry+(e.clientX-dragRef.current.x)*.4})};
     const onMU=()=>{dragRef.current=null};
-    const onWh=e=>{e.preventDefault();setZm(z=>Math.max(.3,Math.min(4,z-e.deltaY*.002)))};
+    const onWh=e=>{if(pm!=="3d")return;e.preventDefault();setZm(z=>Math.max(.3,Math.min(4,z-e.deltaY*.002)))};
     el.addEventListener("touchstart",onTS,{passive:false});el.addEventListener("touchmove",onTM,{passive:false});el.addEventListener("touchend",onTE);
     el.addEventListener("mousedown",onMD);el.addEventListener("mousemove",onMM);el.addEventListener("mouseup",onMU);el.addEventListener("mouseleave",onMU);el.addEventListener("wheel",onWh,{passive:false});
     return()=>{el.removeEventListener("touchstart",onTS);el.removeEventListener("touchmove",onTM);el.removeEventListener("touchend",onTE);
@@ -830,6 +833,42 @@ function App(){
   const updateArt=(key,val)=>setArtworks(a=>a.map((x,i)=>i===selArt?{...x,[key]:val}:x));
   const resetBranding=()=>{setPrintType("CMYK");setPrintCoverage(40);setBrandColors(["#f59e0b","#000000","#ffffff"]);setArtworks([]);setSelArt(0)};
 
+  // 2D artwork drag helpers
+  const svgHit=(e,svg,rr)=>{
+    if(!svg||!rr)return null;
+    const rect=svg.getBoundingClientRect();
+    const ww=rr.width,hh=rr.height,p=10;
+    const vbW=ww+p*2,vbH=hh+p*2;
+    const scaleX=vbW/rect.width,scaleY=vbH/rect.height,scale=Math.max(scaleX,scaleY);
+    const offX=(rect.width*scale-vbW)/2,offY=(rect.height*scale-vbH)/2;
+    const cx=(e.clientX||e.touches?.[0]?.clientX||0)-rect.left;
+    const cy=(e.clientY||e.touches?.[0]?.clientY||0)-rect.top;
+    const svgX=cx*scale-offX-p,svgY=cy*scale-offY-p;
+    // Hit test panels (in flipped Y)
+    const panels=getPanels(boxId,L,W,H);
+    let hit=null;
+    panels.forEach(pl=>{const py=hh-pl.y-pl.h;if(svgX>=pl.x&&svgX<=pl.x+pl.w&&svgY>=py&&svgY<=py+pl.h)hit={...pl,pyFlip:py}});
+    return{svgX,svgY,hit,scale,offX,offY,rect,panels};
+  };
+  const onArtDown=(e)=>{
+    if(!artworks.length||!svgRef.current||!r)return;
+    const info=svgHit(e.nativeEvent||e,svgRef.current,r);
+    if(!info)return;
+    if(info.hit)updateArt("panel",info.hit.name);
+    artDragRef.current={...info,panel:info.hit};
+  };
+  const onArtMove=(e)=>{
+    if(!artDragRef.current)return;
+    const d=artDragRef.current,pl=d.panel;if(!pl)return;
+    const cx2=(e.clientX||e.touches?.[0]?.clientX||0)-d.rect.left;
+    const cy2=(e.clientY||e.touches?.[0]?.clientY||0)-d.rect.top;
+    const svgX2=cx2*d.scale-d.offX-10,svgY2=cy2*d.scale-d.offY-10;
+    const relX=Math.max(0,Math.min(100,((svgX2-pl.x)/pl.w)*100));
+    const relY=Math.max(0,Math.min(100,((svgY2-pl.pyFlip)/pl.h)*100));
+    updateArt("posX",Math.round(relX));
+    updateArt("posY",Math.round(relY));
+  };
+  const onArtUp=()=>{artDragRef.current=null};
 
   // ── 3D render ──
   const render3D=()=>{
@@ -916,7 +955,18 @@ function App(){
     parts.forEach(mesh=>{const pv=mesh.v.map(v=>proj(v[0],v[1],v[2]));
       mesh.f.forEach(f=>{const pts=f.map(i=>pv[i]);const v1={x:pts[1].px-pts[0].px,y:pts[1].py-pts[0].py};const v2={x:pts[f.length-1].px-pts[0].px,y:pts[f.length-1].py-pts[0].py};
         const cr=v1.x*v2.y-v1.y*v2.x;const alpha=Math.min(.55,Math.abs(cr)/(80*Math.max(sl,sw,sh)+1)*.6+.04);
-        allFaces.push({pts,avgZ:pts.reduce((s,p)=>s+p.z,0)/pts.length,alpha,cross:cr,col:mesh.col||P})});
+        // Compute 3D normal for panel detection
+        let panel=null;
+        if(f.length>=3){const a=f[0],b=f[1],c=f[f.length-1];
+          const e1=[mesh.v[b][0]-mesh.v[a][0],mesh.v[b][1]-mesh.v[a][1],mesh.v[b][2]-mesh.v[a][2]];
+          const e2=[mesh.v[c][0]-mesh.v[a][0],mesh.v[c][1]-mesh.v[a][1],mesh.v[c][2]-mesh.v[a][2]];
+          const nx=e1[1]*e2[2]-e1[2]*e2[1],ny=e1[2]*e2[0]-e1[0]*e2[2],nz=e1[0]*e2[1]-e1[1]*e2[0];
+          const nl=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+          const anx=Math.abs(nx/nl),any=Math.abs(ny/nl),anz=Math.abs(nz/nl);
+          if(anz>anx&&anz>any)panel=nz>0?"front":"back";
+          else if(anx>any)panel=nx>0?"right":"left";
+          else panel=ny>0?"top":"bottom"}
+        allFaces.push({pts,avgZ:pts.reduce((s,p)=>s+p.z,0)/pts.length,alpha,cross:cr,col:mesh.col||P,panel})});
       if(mesh.v.length===8)[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]].forEach(([a,b])=>allEdges.push([pv[a],pv[b]]));
       else if(mesh.v.length===4)[[0,1],[1,2],[2,3],[3,0]].forEach(([a,b])=>allEdges.push([pv[a],pv[b]]));
     });
@@ -925,7 +975,23 @@ function App(){
     return <svg viewBox="0 0 400 350" style={{width:"100%",height:"100%",background:S.canvas,pointerEvents:"none"}}>
       <rect width="400" height="350" fill={S.canvas}/>
       <ellipse cx={cx} cy={cy+sh/2*zm+22} rx={sl*.6} ry={sw*.15} fill="#f59e0b" fillOpacity=".06"/>
-      {allFaces.filter(f=>f.cross>0).map((f,i)=><polygon key={i} points={f.pts.map(p=>p.px+","+p.py).join(" ")} fill={f.col+f.alpha.toFixed(2)+")"} stroke="#f59e0b" strokeWidth=".6" strokeOpacity=".4"/>)}
+      {allFaces.filter(f=>f.cross>0).map((f,i)=>{
+        // Find artwork for this face
+        const faceArts=[];
+        if(f.panel&&artworks.length>0){artworks.forEach((art,ai)=>{
+          const tp=art.panel==="all"?["front","back","left","right"]:[art.panel];
+          if(tp.indexOf(f.panel)>=0)faceArts.push({art,ai})})}
+        // Face bounding box for artwork placement
+        let x1=f.pts[0].px,y1=f.pts[0].py,x2=x1,y2=y1;
+        for(let k=1;k<f.pts.length;k++){if(f.pts[k].px<x1)x1=f.pts[k].px;if(f.pts[k].px>x2)x2=f.pts[k].px;if(f.pts[k].py<y1)y1=f.pts[k].py;if(f.pts[k].py>y2)y2=f.pts[k].py}
+        const fw=x2-x1,fh=y2-y1;
+        return <g key={"fz"+i}>
+          <polygon points={f.pts.map(p=>p.px+","+p.py).join(" ")} fill={f.col+f.alpha.toFixed(2)+")"} stroke="#f59e0b" strokeWidth=".6" strokeOpacity=".4"/>
+          {faceArts.length>0&&fw>12&&fh>12&&faceArts.map(fa=>{
+            const sc2=fa.art.scale/100,iw2=fw*sc2,ih2=fh*sc2;
+            const ix2=x1+(fw-iw2)*(fa.art.posX/100),iy2=y1+(fh-ih2)*(fa.art.posY/100);
+            return <image key={"ai3d"+fa.ai} href={fa.art.data} x={ix2} y={iy2} width={iw2} height={ih2} preserveAspectRatio="xMidYMid meet" opacity=".85"/>})}
+        </g>})}
       {allEdges.map(([p1,p2],i)=><line key={"e"+i} x1={p1.px} y1={p1.py} x2={p2.px} y2={p2.py} stroke="#f59e0b" strokeWidth="1" strokeOpacity=".5"/>)}
       <text x={mB.px} y={mB.py+14} textAnchor="middle" fill="#94a3b8" fontSize="12" fontFamily="monospace" fontWeight="700">{L}mm</text>
       <text x={mSi.px+10} y={mSi.py} fill="#94a3b8" fontSize="12" fontFamily="monospace" fontWeight="700">{H}mm</text>
@@ -997,7 +1063,9 @@ function App(){
             :pm==="2d"?(()=>{const{segments:ss,width:ww,height:hh}=r;const p=10;
               const dm={cut:"none",fold:"6,3",crease:"8,3,2,3",glue:"3,3",perf:"2,4",tongue:"4,2",groove:"2,2,6,2"};
               const sw2={cut:1.2,fold:.7,crease:.5,glue:.5,perf:.6,tongue:1,groove:.8};
-              return <svg viewBox={-p+" "+(-p)+" "+(ww+p*2)+" "+(hh+p*2)} style={{width:"100%",height:"100%",background:S.canvas,pointerEvents:"none"}}>
+              return <svg ref={svgRef} viewBox={-p+" "+(-p)+" "+(ww+p*2)+" "+(hh+p*2)} style={{width:"100%",height:"100%",background:S.canvas,cursor:artworks.length?"move":"crosshair"}}
+                onMouseDown={onArtDown} onMouseMove={onArtMove} onMouseUp={onArtUp} onMouseLeave={onArtUp}
+                onTouchStart={e=>{if(artworks.length){onArtDown(e)}}} onTouchMove={e=>{if(artDragRef.current){e.preventDefault();onArtMove(e.nativeEvent||e)}}} onTouchEnd={onArtUp}>
                 <defs><pattern id="gr" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke={S.bd} strokeWidth=".15"/></pattern></defs>
                 <rect x={-p*4} y={-p*4} width={(ww+p*2)*4} height={(hh+p*2)*4} fill="url(#gr)"/>
                 {ss.map((s,i)=><line key={i} x1={s.x1} y1={hh-s.y1} x2={s.x2} y2={hh-s.y2} stroke={LC[s.type]} strokeWidth={sw2[s.type]||.6} strokeDasharray={dm[s.type]} strokeLinecap="round"/>)}
@@ -1019,7 +1087,9 @@ function App(){
                         transform={art.rot!==0?`rotate(${art.rot},${cx2},${cy2})`:undefined}/>
                       {isSel&&<rect x={ix} y={iy} width={iw} height={ih} fill="none" stroke={S.ac} strokeWidth=".6" strokeDasharray="2,2" strokeOpacity=".6"/>}
                     </g>})})})()}
-                <text x={ww/2} y={hh+p-1} textAnchor="middle" fill={S.ac} fontSize="5" fontFamily="monospace">{ww.toFixed(0)}×{hh.toFixed(0)}mm</text></svg>})()
+                <text x={ww/2} y={hh+p-1} textAnchor="middle" fill={S.ac} fontSize="5" fontFamily="monospace">{ww.toFixed(0)}×{hh.toFixed(0)}mm</text>
+                {artworks.length>0&&<text x={ww/2} y={-3} textAnchor="middle" fill={S.ac} fontSize="3.5" fontFamily="monospace" fillOpacity=".5">Drag on panel to reposition artwork</text>}
+                </svg>})()
             :render3D()}
             {pm==="3d"&&r&&<button onClick={()=>{setRot({x:-25,y:35});setZm(1)}} style={{position:"absolute",top:8,right:8,padding:"6px 12px",borderRadius:10,background:"rgba(10,15,26,.85)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",border:"1px solid "+S.bd,color:S.td,fontSize:11,fontWeight:700,fontFamily:"monospace",pointerEvents:"auto",zIndex:2}}>↺ Reset View</button>}
           </div>
